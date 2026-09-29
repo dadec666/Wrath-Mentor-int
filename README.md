@@ -50,8 +50,13 @@ COMMANDS
 
   Personal notes are stored in your saved variables, keyed by raid and boss name.
 
-<img width="993" height="649" alt="Screenshot 2026-09-22 111829" src="https://github.com/user-attachments/assets/f214bef6-9c32-4ab1-a6f3-2456928f8c04" />
+<img width="1070" height="725" alt="Screenshot 2026-09-29 153434" src="https://github.com/user-attachments/assets/ef25c010-97f5-41b8-bc36-50b9137133d5" />
 
-<img width="1252" height="643" alt="Screenshot 2026-09-22 111901" src="https://github.com/user-attachments/assets/9b55385f-4f26-4deb-93ee-62efa8d0a0ed" />
+<img width="1068" height="718" alt="Screenshot 2026-09-29 153452" src="https://github.com/user-attachments/assets/208d4907-d194-4c9d-88b2-d144e926bc0d" />
 
-<img width="451" height="146" alt="Screenshot 2026-09-22 111911" src="https://github.com/user-attachments/assets/6db2eddd-c8de-4253-b64d-1441d82c6b02" />
+<img width="1071" height="715" alt="Screenshot 2026-09-29 153458" src="https://github.com/user-attachments/assets/f291a783-42cf-4d0a-ac8f-982f745e374d" />
+
+<img width="444" height="180" alt="Screenshot 2026-09-29 153514" src="https://github.com/user-attachments/assets/634b6403-aa02-4a8f-81a3-35673dbac64e" />
+
+<img width="572" height="500" alt="Screenshot 2026-09-29 153530" src="https://github.com/user-attachments/assets/d3e61331-8fb0-498e-bb20-9251a9476553" />
+
