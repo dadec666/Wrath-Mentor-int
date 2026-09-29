@@ -1,54 +1,127 @@
-WRATH MENTOR v2.2.4  -  in-game tactics for every WotLK raid (WoW 3.3.5a)
-==========================================================================
+# Wrath Mentor (WoW 3.3.5a)
 
-INSTALL
-  Delete any old WrathMentor folder, then copy this "WrathMentor" folder into:
-      <WoW folder>\Interface\AddOns\
-  Restart the game (or /reload). Your saved settings are kept.
+Внутриигровой справочник тактик для всех рейдовых подземелий дополнения *Wrath of the Lich King* (патч 3.3.5a, Interface 30300). Включает разделение на 10/25 игроков, фильтрацию по ролям, всплывающие подсказки при выборе босса в цель, кликабельные ссылки на способности, личные заметки и модульную систему локализации с поддержкой русского языка.
 
-WHAT'S IN THE WINDOW (/wm)
-  Left: raid + boss list (bosses with a personal note are tinted blue).
-  Top row:  All / Tank / Healer / DPS  |  10 / 25  |  Notes  |  Copy
-    - Role buttons filter the tips.
-    - 10 / 25 switches the text to the 10-man or 25-man version
-      (add counts, tank counts, number of marked players, etc.).
-    - Notes opens a side box for your own notes on that boss. Press Save to keep them.
-      (Unsaved text is also saved automatically if you change boss, close the box or the window.)
-    - Copy shows the whole boss text as plain, selectable text: drag with the mouse to select
-      part of it, or press Select all, then Ctrl+C. Press Back to return.
-  Each boss shows: TL;DR, How to start the fight, Strategy (by phase), Tank/Healer/DPS tips,
-  Boss abilities and the Hard mode / Heroic explanation.
+---
 
-BOSS POPUP
-  When you target a boss inside a raid, a small popup shows the boss's TL;DR.
-  Inside a fight it appears at most ONCE per boss: if you close it, targeting an add and then the
-  boss again will not bring it back. It can appear again in the next fight.
+### Об авторе и форке
 
-SEND TO CHAT
-  "Send to chat" (and the Send button on the popup) posts ONLY the Strategy section of the boss,
-  in the selected 10/25-man version, one line at a time.
+* **Оригинальный автор аддона:** **Saranwrap**.
 
-ABILITY LINKS
-  Abilities are shown as [Spell Name]. Hover for the real game tooltip, click to open it,
-  shift-click to put the link in chat.
-  A link is only created when this client confirms the spell ID has the expected name, so a wrong ID
-  can never show a wrong spell. Abilities without a confirmed ID appear as plain white text.
-  /wm checklinks tells you how many abilities linked on your client.
 
-COMMANDS
-  /wm                          open / close
-  /wm <boss name>              open a boss (partial names work: /wm lich, /wm sapph, /wm yogg)
-  /wm role all|tank|heal|dps   role filter
-  /wm size 10|25               choose 10-man or 25-man text
-  /wm notes                    open / close the notes box
-  /wm quick                    toggle the TL;DR popup when you target a boss (once per fight)
-  /wm config                   settings panel (also: right-click the minimap button)
-  /wm minimap                  show / hide the minimap button
-  /wm send [raid|party|say]    send the selected boss's Strategy section to chat
-  /wm checklinks               report resolved ability links
-  /wm reset                    reset window positions
+* **Репозиторий форка:** [dadec666/Wrath-Mentor](https://github.com/dadec666/Wrath-Mentor)
+* **Изменения в форке:**
+* Разработан модульный движок локализации (`Localization.lua`), позволяющий подключать любые языки без изменения файлов баз данных.
+* Добавлен полный перевод интерфейса, команд и тактик на русский язык (`ruRU`).
+* Все имена боссов, аддов, зон и способностей сверены со 100% точностью по официальной базе клиента World of Warcraft 3.3.5a (ruRU).
+* Исправлена работа `strlower` для корректного поиска боссов на кириллице.
+* Исправлен механизм разрешения ссылок на заклинания (`ResolveSpell`), благодаря чему тултипы и иконки способностей корректно отображаются на русскоязычном клиенте.
 
-  Personal notes are stored in your saved variables, keyed by raid and boss name.
+
+
+
+
+---
+
+### Основные возможности
+
+* **Главное окно (`/wm`):**
+
+* Слева расположен список рейдов и боссов (боссы с сохранёнными личными заметками подсвечиваются синим цветом).
+
+
+* Переключение режима рейда **10 / 25**: автоматически пересчитывает тайминги, количество аддов, меток и танков.
+
+
+* Фильтр по ролям (**Все / Танк / Хил / ДД**): скрывает лишние советы и оставляет задачи для выбранной роли.
+
+
+* Разделы описания: Кратко (TL;DR), Начало боя, Тактика по фазам, Советы ролям, Способности босса и Сложный / Героический режим.
+
+
+* Изменение размера окна: свободное растягивание за нижний правый угол либо масштабирование через ползунок в настройках.
+
+
+
+
+* **Всплывающее окно (TL;DR Popup):** при взятии босса в цель внутри инстанса появляется компактное окно с краткой сутью боя. В бою срабатывает максимум 1 раз на босса.
+
+
+* **Ссылки на способности:** способности боссов отображаются в виде интерактивных ссылок с иконками. Наведение открывает стандартный игровой тултип, клик открывает окно заклинания, Shift+клик вставляет ссылку в чат.
+
+
+* **Отправка тактики в чат:** кнопка «Отправить в чат» (Send to chat) построчно транслирует раздел тактики в рейд, группу или канал «Сказать».
+
+
+* **Личные заметки:** кнопка «Заметки» открывает боковую панель для собственных пометок по тактике для каждого конкретного босса (сохраняются автоматически в `SavedVariables`).
+
+
+* **Копирование текста:** кнопка «Копия» открывает тактику в виде обычного текста для быстрого выделения и копирования через `Ctrl+C`.
+
+
+
+---
+
+### Установка
+
+1. Скачайте архив репозитория.
+2. Скопируйте папку аддона по пути:
+```text
+<Папка с игрой>\Interface\AddOns\WrathMentor\
+
+```
+
+
+3. Перезапустите клиент игры (или выполните команду `/reload`, если игра запущена).
+
+
+
+---
+
+### Команды консоли
+
+| Команда | Описание |
+| --- | --- |
+| `/wm` | Открыть или закрыть главное окно тактик.|
+| `/wm <имя>` | Открыть тактику конкретного босса (работают частичные имена, напр. `/wm лич` или `/wm yogg`).|
+| `/wm role all\|tank\|heal\|dps` | Переключить фильтр роли.|
+| `/wm size 10\|25` | Переключить размер рейда (10 или 25 человек).|
+| `/wm notes` | Открыть или закрыть панель личных заметок.|
+| `/wm quick` | Включить или выключить всплывающее окно при выборе босса в цель.|
+| `/wm config` | Открыть панель настроек (также открывается правым кликом по кнопке у миникарты).|
+| `/wm minimap` | Показать или скрыть кнопку у миникарты.|
+| `/wm send [raid\|party\|say]` | Отправить тактику выбранного босса в указанный чат.|
+| `/wm checklinks` | Проверить, сколько способностей боссов разрешено в кликабельные ссылки на вашем клиенте.|
+| `/wm reset` | Сбросить позиции и размеры окон на значения по умолчанию.|
+
+---
+
+### Добавление новых локализаций
+
+Аддон построен по модульной схеме: оригинальные базы данных (`Data_*.lua`) остаются на английском языке. Для добавления нового языка (например, `deDE` или `frFR`):
+
+1. Создайте каталог `Locales\<locale>\` (например, `Locales\deDE\`).
+2. Создайте файл глоссария `UI_<locale>.lua`, зарегистрировав строковые переводы интерфейса и имен через:
+```lua
+WM:RegisterLocale("deDE", { ... })
+
+```
+
+
+3. Создайте файлы перевода тактик `Data_<raid>.lua`, наложив текст через:
+```lua
+WM:RegisterTactics("deDE", "<raidId>", { ... })
+
+```
+
+
+4. Подключите созданные файлы в `WrathMentor.toc`.
+
+
+
+---
+
+### Скриншоты
 
 <img width="1070" height="725" alt="Screenshot 2026-09-29 153434" src="https://github.com/user-attachments/assets/ef25c010-97f5-41b8-bc36-50b9137133d5" />
 
