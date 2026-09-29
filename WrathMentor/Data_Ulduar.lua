@@ -216,11 +216,11 @@ WM:AddRaid("uld", "Ulduar", { "Ulduar" }, {
         dps = { "Right Arm first (it damages the body on death), then the body. Ranged AoE Rubble. Run from Focused Eyebeam." },
         abilities = {
             { ids = { 63356, 64003 }, name = "Overhead Smash", desc = "Heavy hit on the tank that applies a stack of Crunch Armor." },
-            { name = "Crunch Armor", desc = "Stacking armor reduction from Overhead Smash. Taunt off at 2 stacks." },
+            { id = 64002, name = "Crunch Armor", desc = "Stacking armor reduction from Overhead Smash. Taunt off at 2 stacks." },
             { ids = { 62166, 63981 }, name = "Stone Grip", desc = "The Right Arm grabs a player (1 in 10-man, 3 in 25-man), dealing damage every second. Free them with damage on the arm before 15 seconds is up, or they die." },
             { ids = { 63783, 63982 }, name = "Shockwave", desc = "The Left Arm's constant raid damage." },
             { ids = { 63346, 63976 }, name = "Focused Eyebeam", desc = "A beam on one player that deals AoE damage around them. Run away from the raid." },
-            { name = "Petrifying Breath", desc = "Channeled heavy Nature damage plus a stacking Brittle Skin debuff, cast only when nobody is in melee range of Kologarn's body." },
+            { id = 62030, name = "Petrifying Breath", desc = "Channeled heavy Nature damage plus a stacking Brittle Skin debuff, cast only when nobody is in melee range of Kologarn's body." },
         },
     },
     {
