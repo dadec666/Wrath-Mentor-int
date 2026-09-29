@@ -122,14 +122,15 @@ WM:RegisterTactics("deDE", "<raidId>", { ... })
 ---
 
 ### Скриншоты
+<table>
+  <tr>
+    <td width="50%"><img src="img/Снимок экрана 2026-09-30 011258.png" alt="Скриншот 1"></td>
+    <td width="50%"><img src="img/Снимок экрана 2026-09-30 011311.png" alt="Скриншот 2"></td>
+  </tr>
+  <tr>
+    <td width="50%"><img src="img/Снимок экрана 2026-09-30 011401.png" alt="Скриншот 3"></td>
+    <td width="50%"><img src="img/Снимок экрана 2026-09-30 011421.png" alt="Скриншот 4"></td>
+  </tr>
+</table>
 
-<img width="1070" height="725" alt="Screenshot 2026-09-29 153434" src="https://github.com/user-attachments/assets/ef25c010-97f5-41b8-bc36-50b9137133d5" />
-
-<img width="1068" height="718" alt="Screenshot 2026-09-29 153452" src="https://github.com/user-attachments/assets/208d4907-d194-4c9d-88b2-d144e926bc0d" />
-
-<img width="1071" height="715" alt="Screenshot 2026-09-29 153458" src="https://github.com/user-attachments/assets/f291a783-42cf-4d0a-ac8f-982f745e374d" />
-
-<img width="444" height="180" alt="Screenshot 2026-09-29 153514" src="https://github.com/user-attachments/assets/634b6403-aa02-4a8f-81a3-35673dbac64e" />
-
-<img width="572" height="500" alt="Screenshot 2026-09-29 153530" src="https://github.com/user-attachments/assets/d3e61331-8fb0-498e-bb20-9251a9476553" />
 
