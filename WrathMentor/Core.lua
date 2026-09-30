@@ -12,17 +12,19 @@ WM.selected = nil    -- boss currently shown in the main window
 
 local DEFAULTS = {
     role = "ALL",                -- ALL | TANK | HEAL | DPS
-    size = 25,                   -- 10 or 25 (which raid size the text is written for)
+    size = 25,                   -- 10 or 25
+    theme = "dark",              -- "dark" (Flat/Dark) | "classic" (Blizzard Dialog)
+    quickRole = "TLDR",          -- TLDR | TANK | HEAL | DPS
     quick = true,                -- popup when you target a boss
     quickRaidOnly = true,        -- only show the popup inside raid instances
     quickHideAfterCombat = true, -- hide the popup when combat ends
     quickScale = 1.0,            -- popup size
-    mainScale = 1.0,             -- tactics window size (UI scale slider)
-    mainWidth = 760,             -- tactics window width (drag-to-resize corner)
-    mainHeight = 500,            -- tactics window height (drag-to-resize corner)
+    mainScale = 1.0,             -- tactics window size
+    mainWidth = 760,             -- tactics window width
+    mainHeight = 500,            -- tactics window height
     minimap = { hide = false, angle = 225 },
     collapsed = {},              -- collapsed raids in the list
-    notes = {},                  -- personal notes, keyed by "<raid>:<boss name>"
+    notes = {},                  -- personal notes
 }
 WM.DEFAULTS = DEFAULTS
 
@@ -35,7 +37,7 @@ local function lower(s)
 end
 
 ------------------------------------------------------------------
--- Data registration (called by the Data_*.lua files)
+-- Data registration
 ------------------------------------------------------------------
 function WM:AddRaid(id, name, zones, bosses, src)
     local localizedRaidName = self.L[name] or name
@@ -50,7 +52,6 @@ function WM:AddRaid(id, name, zones, bosses, src)
     self.raids[id] = raid
     table.insert(self.raidOrder, id)
 
-    -- Register localized zone names for GetRealZoneText() in ruRU
     for _, z in ipairs(zones or {}) do
         local locZ = self.L[z]
         if locZ and locZ ~= z then
@@ -115,6 +116,8 @@ function WM:ResetOptions()
     self.db.quickHideAfterCombat = d.quickHideAfterCombat
     self.db.quickScale = d.quickScale
     self.db.mainScale = d.mainScale
+    self.db.theme = d.theme
+    self.db.quickRole = d.quickRole
     self.db.minimap.hide = d.minimap.hide
     self.db.minimap.angle = d.minimap.angle
     self:ApplySettings()
@@ -311,6 +314,30 @@ end
 -- Quick popup text
 ------------------------------------------------------------------
 function WM:GetQuickText(boss)
+    if not boss then return "" end
+    local qRole = (self.db and self.db.quickRole) or "TLDR"
+    if qRole == "TANK" and boss.tank and #boss.tank > 0 then
+        local list = self:ExpandList(boss.tank)
+        if #list > 0 then
+            local out = {}
+            for _, s in ipairs(list) do out[#out + 1] = "• " .. s end
+            return table.concat(out, "\n")
+        end
+    elseif qRole == "HEAL" and boss.heal and #boss.heal > 0 then
+        local list = self:ExpandList(boss.heal)
+        if #list > 0 then
+            local out = {}
+            for _, s in ipairs(list) do out[#out + 1] = "• " .. s end
+            return table.concat(out, "\n")
+        end
+    elseif qRole == "DPS" and boss.dps and #boss.dps > 0 then
+        local list = self:ExpandList(boss.dps)
+        if #list > 0 then
+            local out = {}
+            for _, s in ipairs(list) do out[#out + 1] = "• " .. s end
+            return table.concat(out, "\n")
+        end
+    end
     return self:Expand(boss.tldr) or boss.tldr or ""
 end
 
