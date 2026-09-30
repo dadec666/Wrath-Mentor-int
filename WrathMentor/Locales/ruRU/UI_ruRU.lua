@@ -14,12 +14,18 @@ WM:RegisterLocale("ruRU", {
     ["Tanks"] = "Танки",
     ["Healers"] = "Лекари",
 
+    -- Anchor Navigation Buttons
+    ["Start"] = "Начало",
+    ["Strategy"] = "Тактика",
+    ["Roles"] = "Роли",
+    ["Abilities"] = "Способности",
+    ["Hard mode"] = "Хардмод",
+
     ["Wrath Mentor - WotLK Raid Tactics"] = "Wrath Mentor - Тактики рейдов WotLK",
     ["TL;DR"] = "Кратко",
     ["TL;DR: "] = "Кратко: ",
     ["How to start the fight"] = "Начало боя",
     ["HOW TO START THE FIGHT"] = "НАЧАЛО БОЯ",
-    ["Strategy"] = "Тактика",
     ["STRATEGY"] = "ТАКТИКА",
     ["TANKS"] = "ТАНКИ",
     ["HEALERS"] = "ЛЕКАРИ",
@@ -63,6 +69,7 @@ WM:RegisterLocale("ruRU", {
 
     -- Settings panel
     ["WotLK raid tactics. Changes apply immediately. Type /wm help for commands."] = "Тактики рейдов WotLK. Изменения применяются сразу. Введите /wm help для списка команд.",
+    ["Use dark interface style (Flat/Dark)"] = "Темная тема оформления (Flat/Dark)",
     ["Show the minimap button"] = "Показывать кнопку у миникарты",
     ["Show a popup when I target a boss"] = "Показывать окно при выборе босса в цель",
     ["Only show the popup inside raid instances"] = "Показывать окно только в рейдовых подземельях",
