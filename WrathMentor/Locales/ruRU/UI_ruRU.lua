@@ -279,4 +279,11 @@ WM:RegisterLocale("ruRU", {
     ["Twilight Halion"] = "Сумеречный Халион",
     ["Living Inferno"] = "Живое адское пламя",
     ["Living Ember"] = "Живой уголек",
+
+    -- Новые строки v2.3.1 (Buffs & Debuffs)
+    ["BUFFS & DEBUFFS"] = "БАФФЫ И ДЕБАФФЫ",
+    ["buff"] = "бафф",
+    ["debuff"] = "дебафф",
+    ["Buff"] = "Бафф",
+    ["Debuff"] = "Дебафф",
 })
