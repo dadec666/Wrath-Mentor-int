@@ -1,4 +1,4 @@
--- Wrath Mentor - UI (v2.3.1 Flat/Dark & Statuses Edition)
+-- Wrath Mentor - UI (v2.3.2 Structured Controls Edition)
 local WM = WrathMentor
 
 local ROW_H = 18
@@ -23,18 +23,18 @@ local ui = {
 WM.ui = ui
 
 local ROLES = {
-    { "ALL", "All", 48 },
-    { "TANK", "Tank", 52 },
-    { "HEAL", "Healer", 60 },
-    { "DPS", "DPS", 48 },
+    { "ALL", "All", 44 },
+    { "TANK", "Tank", 48 },
+    { "HEAL", "Healer", 52 },
+    { "DPS", "DPS", 44 },
 }
 
 local ANCHORS = {
-    { key = "start", label = "Start", w = 64 },
-    { key = "strat", label = "Strategy", w = 72 },
-    { key = "roles", label = "Roles", w = 58 },
-    { key = "abil",  label = "Abilities", w = 92 },
-    { key = "hard",  label = "Hard mode", w = 82 },
+    { key = "start", label = "Start", w = 58 },
+    { key = "strat", label = "Strategy", w = 68 },
+    { key = "roles", label = "Roles", w = 54 },
+    { key = "abil",  label = "Abilities", w = 84 },
+    { key = "hard",  label = "Hard mode", w = 76 },
 }
 
 local QUICK_ROLES = {
@@ -294,10 +294,12 @@ function WM:ApplyTheme()
             ui.main:SetBackdropColor(0.08, 0.09, 0.12, 0.96)
             ui.main:SetBackdropBorderColor(0.25, 0.28, 0.38, 1)
             if ui.main.separator then ui.main.separator:Show() end
+            if ui.main.sepGroup then ui.main.sepGroup:Show() end
         else
             ui.main:SetBackdropColor(1, 1, 1, 1)
             ui.main:SetBackdropBorderColor(1, 1, 1, 1)
             if ui.main.separator then ui.main.separator:Hide() end
+            if ui.main.sepGroup then ui.main.sepGroup:Hide() end
         end
     end
 
@@ -591,7 +593,6 @@ function WM:RefreshDetail()
                 row.icon:SetTexture(WM:GetSpellIcon(ab))
                 local abDisplayName = ab.resolvedName or self.L[ab.name] or ab.name
 
-                -- Status Badge (Buff / Debuff)
                 local kindTag = ""
                 if ab.kind == "buff" then
                     kindTag = " " .. C.buff .. "[" .. (self.L["Buff"] or "Buff") .. "]|r"
@@ -953,7 +954,7 @@ local function CreateMain()
     sep:SetVertexColor(0.25, 0.28, 0.38, 0.8)
     f.separator = sep
 
-    -- Right Row 1: Role, Size, Notes, Copy (snug to the separator)
+    -- Right Row 1: Left Group (Roles)
     local prev
     for i, r in ipairs(ROLES) do
         local b = CreateFrame("Button", "WrathMentorRole" .. r[1], f, "UIPanelButtonTemplate")
@@ -963,7 +964,7 @@ local function CreateMain()
         if i == 1 then
             b:SetPoint("TOPLEFT", f, "TOPLEFT", 236, -44)
         else
-            b:SetPoint("LEFT", prev, "RIGHT", 3, 0)
+            b:SetPoint("LEFT", prev, "RIGHT", 2, 0)
         end
         local roleKey = r[1]
         b:SetScript("OnClick", function() WM:SetRole(roleKey) end)
@@ -972,12 +973,27 @@ local function CreateMain()
         prev = b
     end
 
-    for _, size in ipairs({ 10, 25 }) do
+    -- Divider between Roles and Raid Size
+    local sepGroup = f:CreateTexture(nil, "BORDER")
+    sepGroup:SetPoint("LEFT", prev, "RIGHT", 8, 0)
+    sepGroup:SetWidth(1)
+    sepGroup:SetHeight(18)
+    sepGroup:SetTexture(SOLID)
+    sepGroup:SetVertexColor(0.30, 0.33, 0.45, 0.75)
+    f.sepGroup = sepGroup
+
+    -- Right Row 1: Left Group (Raid Size: 10 / 25)
+    local prevSize = sepGroup
+    for i, size in ipairs({ 10, 25 }) do
         local b = CreateFrame("Button", "WrathMentorSize" .. size, f, "UIPanelButtonTemplate")
-        b:SetWidth(34)
+        b:SetWidth(32)
         b:SetHeight(22)
         b:SetText(tostring(size))
-        b:SetPoint("LEFT", prev, "RIGHT", (size == 10) and 10 or 3, 0)
+        if i == 1 then
+            b:SetPoint("LEFT", prevSize, "RIGHT", 8, 0)
+        else
+            b:SetPoint("LEFT", prevSize, "RIGHT", 2, 0)
+        end
         local s = size
         b:SetScript("OnClick", function() WM:SetSize(s) end)
         b:SetScript("OnEnter", function(self)
@@ -988,29 +1004,14 @@ local function CreateMain()
         b:SetScript("OnLeave", function() GameTooltip:Hide() end)
         RegisterButton(b)
         ui.sizeButtons[size] = b
-        prev = b
+        prevSize = b
     end
 
-    local nb = CreateFrame("Button", "WrathMentorNotesButton", f, "UIPanelButtonTemplate")
-    nb:SetWidth(66)
-    nb:SetHeight(22)
-    nb:SetPoint("LEFT", prev, "RIGHT", 10, 0)
-    nb:SetText(WM.L["Notes"])
-    nb:SetScript("OnClick", function() WM:ToggleNotes() end)
-    nb:SetScript("OnEnter", function(self)
-        GameTooltip:SetOwner(self, "ANCHOR_TOP")
-        GameTooltip:AddLine(WM.L["Personal notes for this boss"])
-        GameTooltip:AddLine(WM.L["Opens a side box. Press Save to keep them."], 1, 1, 1)
-        GameTooltip:Show()
-    end)
-    nb:SetScript("OnLeave", function() GameTooltip:Hide() end)
-    RegisterButton(nb)
-    ui.notesButton = nb
-
+    -- Right Row 1: Right Group (Actions: Notes & Copy, anchored to the far right edge)
     local cb = CreateFrame("Button", "WrathMentorCopyButton", f, "UIPanelButtonTemplate")
     cb:SetWidth(56)
     cb:SetHeight(22)
-    cb:SetPoint("LEFT", nb, "RIGHT", 4, 0)
+    cb:SetPoint("TOPRIGHT", f, "TOPRIGHT", -22, -44)
     cb:SetText(WM.L["Copy"])
     cb:SetScript("OnClick", function() WM:ToggleCopy() end)
     cb:SetScript("OnEnter", function(self)
@@ -1023,17 +1024,39 @@ local function CreateMain()
     RegisterButton(cb)
     ui.copyButton = cb
 
-    -- Right Row 2: Anchor navigation buttons
+    local nb = CreateFrame("Button", "WrathMentorNotesButton", f, "UIPanelButtonTemplate")
+    nb:SetWidth(66)
+    nb:SetHeight(22)
+    nb:SetPoint("RIGHT", cb, "LEFT", -4, 0)
+    nb:SetText(WM.L["Notes"])
+    nb:SetScript("OnClick", function() WM:ToggleNotes() end)
+    nb:SetScript("OnEnter", function(self)
+        GameTooltip:SetOwner(self, "ANCHOR_TOP")
+        GameTooltip:AddLine(WM.L["Personal notes for this boss"])
+        GameTooltip:AddLine(WM.L["Opens a side box. Press Save to keep them."], 1, 1, 1)
+        GameTooltip:Show()
+    end)
+    nb:SetScript("OnLeave", function() GameTooltip:Hide() end)
+    RegisterButton(nb)
+    ui.notesButton = nb
+
+    -- Right Row 2: Anchor navigation row with a clean label
+    local navLabel = f:CreateFontString(nil, "ARTWORK", "GameFontNormalSmall")
+    navLabel:SetPoint("TOPLEFT", f, "TOPLEFT", 236, -72)
+    navLabel:SetText(WM.L["Sections:"] or "Sections:")
+    navLabel:SetTextColor(0.55, 0.70, 0.90)
+    ui.navLabel = navLabel
+
     local prevAnchor = nil
     for _, a in ipairs(ANCHORS) do
         local b = CreateFrame("Button", "WrathMentorAnchor" .. a.key, f, "UIPanelButtonTemplate")
         b:SetWidth(a.w)
-        b:SetHeight(19)
+        b:SetHeight(18)
         b:SetText(WM.L[a.label])
         if not prevAnchor then
-            b:SetPoint("TOPLEFT", f, "TOPLEFT", 236, -71)
+            b:SetPoint("LEFT", navLabel, "RIGHT", 8, 0)
         else
-            b:SetPoint("LEFT", prevAnchor, "RIGHT", 4, 0)
+            b:SetPoint("LEFT", prevAnchor, "RIGHT", 3, 0)
         end
         local k = a.key
         b:SetScript("OnClick", function() WM:ScrollToSection(k) end)
@@ -1243,7 +1266,6 @@ local function CreateQuick()
     q.title:SetWidth(312)
     q.title:SetJustifyH("LEFT")
 
-    -- Role Buttons inside Quick Popup
     local prevQR = nil
     for _, qr in ipairs(QUICK_ROLES) do
         local b = CreateFrame("Button", "WrathMentorQuickRole" .. qr.key, q, "UIPanelButtonTemplate")
