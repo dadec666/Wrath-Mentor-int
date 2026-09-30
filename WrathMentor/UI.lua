@@ -1,11 +1,25 @@
--- Wrath Mentor - UI (v2)
+-- Wrath Mentor - UI (v2.3 Flat/Dark Edition)
 local WM = WrathMentor
 
 local ROW_H = 18
-local LIST_W = 196
+local LIST_W = 204
 local DETAIL_W = 440
+local SOLID = "Interface\\Buttons\\WHITE8X8"
 
-local ui = { rows = {}, roleButtons = {}, sizeButtons = {}, fsPool = {}, abPool = {}, optChecks = {} }
+local ui = {
+    rows = {},
+    roleButtons = {},
+    sizeButtons = {},
+    anchorButtons = {},
+    quickRoleButtons = {},
+    sectionOffsets = {},
+    fsPool = {},
+    abPool = {},
+    optChecks = {},
+    skinnedButtons = {},
+    skinnedScrollBars = {},
+    skinnedCheckboxes = {},
+}
 WM.ui = ui
 
 local ROLES = {
@@ -15,18 +29,40 @@ local ROLES = {
     { "DPS", "DPS", 48 },
 }
 
-local BACKDROP_DIALOG = {
+local ANCHORS = {
+    { key = "start", label = "Start", w = 64 },
+    { key = "strat", label = "Strategy", w = 72 },
+    { key = "roles", label = "Roles", w = 58 },
+    { key = "abil",  label = "Abilities", w = 92 },
+    { key = "hard",  label = "Hard mode", w = 82 },
+}
+
+local QUICK_ROLES = {
+    { key = "TLDR", label = "TL;DR", w = 52 },
+    { key = "TANK", label = "Tank",  w = 48 },
+    { key = "HEAL", label = "Healer", w = 56 },
+    { key = "DPS",  label = "DPS",   w = 44 },
+}
+
+local BACKDROP_CLASSIC = {
     bgFile = "Interface\\DialogFrame\\UI-DialogBox-Background",
     edgeFile = "Interface\\DialogFrame\\UI-DialogBox-Border",
     tile = true, tileSize = 32, edgeSize = 32,
     insets = { left = 11, right = 12, top = 12, bottom = 11 },
 }
 
-local BACKDROP_TOOLTIP = {
+local BACKDROP_FLAT_DARK = {
     bgFile = "Interface\\Tooltips\\UI-Tooltip-Background",
     edgeFile = "Interface\\Tooltips\\UI-Tooltip-Border",
-    tile = true, tileSize = 16, edgeSize = 16,
-    insets = { left = 4, right = 4, top = 4, bottom = 4 },
+    tile = true, tileSize = 16, edgeSize = 12,
+    insets = { left = 2, right = 2, top = 2, bottom = 2 },
+}
+
+local BACKDROP_BUTTON_DARK = {
+    bgFile = "Interface\\Tooltips\\UI-Tooltip-Background",
+    edgeFile = "Interface\\Tooltips\\UI-Tooltip-Border",
+    tile = true, tileSize = 16, edgeSize = 10,
+    insets = { left = 2, right = 2, top = 2, bottom = 2 },
 }
 
 local C = {
@@ -75,6 +111,224 @@ local function EnableWheel(sf)
 end
 
 ------------------------------------------------------------------
+-- Skinning Engine (Flat/Dark & Classic)
+------------------------------------------------------------------
+local function RegisterButton(btn)
+    ui.skinnedButtons[#ui.skinnedButtons + 1] = btn
+
+    btn:HookScript("OnEnter", function(self)
+        if WM.db.theme ~= "classic" and self:IsEnabled() == 1 then
+            self:SetBackdropBorderColor(1, 0.82, 0, 1) -- Golden hover
+        end
+    end)
+    btn:HookScript("OnLeave", function(self)
+        if WM.db.theme ~= "classic" and self:IsEnabled() == 1 then
+            self:SetBackdropBorderColor(0.32, 0.35, 0.45, 1)
+        end
+    end)
+end
+
+local function UpdateButtonVisual(btn)
+    local isDark = (WM.db.theme ~= "classic")
+    local nt = btn:GetNormalTexture()
+    local pt = btn:GetPushedTexture()
+    local dt = btn:GetDisabledTexture()
+    local ht = btn:GetHighlightTexture()
+
+    if isDark then
+        if nt then nt:SetAlpha(0) end
+        if pt then pt:SetAlpha(0) end
+        if dt then dt:SetAlpha(0) end
+        if ht then
+            ht:SetTexture(1, 1, 1, 0.12)
+            ht:SetAllPoints(btn)
+        end
+
+        btn:SetBackdrop(BACKDROP_BUTTON_DARK)
+        if btn:IsEnabled() == 1 then
+            btn:SetBackdropColor(0.12, 0.14, 0.18, 0.95)
+            btn:SetBackdropBorderColor(0.32, 0.35, 0.45, 1)
+        else
+            -- Active / Selected Tab
+            btn:SetBackdropColor(0.18, 0.38, 0.65, 0.95)
+            btn:SetBackdropBorderColor(0.40, 0.70, 1.0, 1)
+        end
+    else
+        if nt then nt:SetAlpha(1) end
+        if pt then pt:SetAlpha(1) end
+        if dt then dt:SetAlpha(1) end
+        if ht then
+            ht:SetTexture("Interface\\Buttons\\UI-Panel-Button-Highlight")
+            ht:SetTexCoord(0, 1, 0, 1)
+        end
+        btn:SetBackdrop(nil)
+    end
+end
+
+local function RegisterScrollBar(sf, isLeftList)
+    ui.skinnedScrollBars[#ui.skinnedScrollBars + 1] = { sf = sf, isLeft = isLeftList }
+    local name = sf:GetName()
+    if not name then return end
+
+    local sb = _G[name .. "ScrollBar"]
+    if not sb then return end
+
+    sb.up = _G[name .. "ScrollBarScrollUpButton"]
+    sb.down = _G[name .. "ScrollBarScrollDownButton"]
+
+    local track = sb:CreateTexture(nil, "BACKGROUND")
+    track:SetAllPoints(sb)
+    track:SetTexture(SOLID)
+    sb.track = track
+end
+
+local function UpdateScrollBarVisual(entry)
+    local isDark = (WM.db.theme ~= "classic")
+    local sf = entry.sf
+    local isLeft = entry.isLeft
+    local name = sf:GetName()
+    if not name then return end
+    local sb = _G[name .. "ScrollBar"]
+    if not sb then return end
+
+    local thumb = sb:GetThumbTexture()
+
+    if isDark then
+        -- Suppress Blizzard arrow buttons permanently
+        if sb.up then
+            sb.up:Hide()
+            sb.up:SetAlpha(0)
+            sb.up:EnableMouse(false)
+            sb.up.Show = sb.up.Hide
+        end
+        if sb.down then
+            sb.down:Hide()
+            sb.down:SetAlpha(0)
+            sb.down:EnableMouse(false)
+            sb.down.Show = sb.down.Hide
+        end
+
+        sb:ClearAllPoints()
+        if isLeft then
+            sb:SetPoint("TOPLEFT", sf, "TOPRIGHT", 2, 0)
+            sb:SetPoint("BOTTOMLEFT", sf, "BOTTOMRIGHT", 2, 0)
+        else
+            sb:SetPoint("TOPLEFT", sf, "TOPRIGHT", 4, 0)
+            sb:SetPoint("BOTTOMLEFT", sf, "BOTTOMRIGHT", 4, 0)
+        end
+        sb:SetWidth(6)
+
+        if sb.track then
+            sb.track:Show()
+            sb.track:SetVertexColor(0.06, 0.07, 0.10, 0.6)
+        end
+
+        if thumb then
+            thumb:SetTexture(SOLID)
+            thumb:SetVertexColor(0.35, 0.55, 0.85, 0.85)
+            thumb:SetWidth(6)
+            thumb:SetHeight(28)
+        end
+    else
+        if sb.up then
+            sb.up.Show = nil
+            sb.up:SetAlpha(1)
+            sb.up:EnableMouse(true)
+            sb.up:Show()
+        end
+        if sb.down then
+            sb.down.Show = nil
+            sb.down:SetAlpha(1)
+            sb.down:EnableMouse(true)
+            sb.down:Show()
+        end
+
+        sb:ClearAllPoints()
+        sb:SetPoint("TOPLEFT", sf, "TOPRIGHT", 6, -16)
+        sb:SetPoint("BOTTOMLEFT", sf, "BOTTOMRIGHT", 6, 16)
+        sb:SetWidth(16)
+
+        if sb.track then sb.track:Hide() end
+
+        if thumb then
+            thumb:SetTexture("Interface\\Buttons\\UI-ScrollBar-Knob")
+            thumb:SetVertexColor(1, 1, 1, 1)
+            thumb:SetWidth(18)
+            thumb:SetHeight(24)
+            thumb:SetTexCoord(0.2, 0.8, 0.125, 0.875)
+        end
+    end
+end
+
+local function RegisterCheckbox(cb)
+    ui.skinnedCheckboxes[#ui.skinnedCheckboxes + 1] = cb
+end
+
+local function UpdateCheckboxVisual(cb)
+    local isDark = (WM.db.theme ~= "classic")
+    if isDark then
+        local normal = cb:GetNormalTexture()
+        if normal then normal:SetAlpha(0) end
+        local pushed = cb:GetPushedTexture()
+        if pushed then pushed:SetAlpha(0) end
+
+        cb:SetBackdrop(BACKDROP_BUTTON_DARK)
+        cb:SetBackdropColor(0.12, 0.14, 0.18, 0.95)
+        cb:SetBackdropBorderColor(0.32, 0.35, 0.45, 1)
+    else
+        local normal = cb:GetNormalTexture()
+        if normal then normal:SetAlpha(1) end
+        local pushed = cb:GetPushedTexture()
+        if pushed then pushed:SetAlpha(1) end
+        cb:SetBackdrop(nil)
+    end
+end
+
+function WM:ApplyTheme()
+    local isDark = (self.db.theme ~= "classic")
+    local backdrop = isDark and BACKDROP_FLAT_DARK or BACKDROP_CLASSIC
+
+    if ui.main then
+        ui.main:SetBackdrop(backdrop)
+        if isDark then
+            ui.main:SetBackdropColor(0.08, 0.09, 0.12, 0.96)
+            ui.main:SetBackdropBorderColor(0.25, 0.28, 0.38, 1)
+            if ui.main.separator then ui.main.separator:Show() end
+        else
+            ui.main:SetBackdropColor(1, 1, 1, 1)
+            ui.main:SetBackdropBorderColor(1, 1, 1, 1)
+            if ui.main.separator then ui.main.separator:Hide() end
+        end
+    end
+
+    if ui.notes then
+        ui.notes:SetBackdrop(backdrop)
+        if isDark then
+            ui.notes:SetBackdropColor(0.08, 0.09, 0.12, 0.96)
+            ui.notes:SetBackdropBorderColor(0.25, 0.28, 0.38, 1)
+        else
+            ui.notes:SetBackdropColor(1, 1, 1, 1)
+            ui.notes:SetBackdropBorderColor(1, 1, 1, 1)
+        end
+    end
+
+    if ui.quick then
+        ui.quick:SetBackdrop(backdrop)
+        if isDark then
+            ui.quick:SetBackdropColor(0.08, 0.09, 0.12, 0.96)
+            ui.quick:SetBackdropBorderColor(0.25, 0.28, 0.38, 1)
+        else
+            ui.quick:SetBackdropColor(0, 0, 0, 0.88)
+            ui.quick:SetBackdropBorderColor(1, 1, 1, 1)
+        end
+    end
+
+    for _, btn in ipairs(ui.skinnedButtons) do UpdateButtonVisual(btn) end
+    for _, entry in ipairs(ui.skinnedScrollBars) do UpdateScrollBarVisual(entry) end
+    for _, cb in ipairs(ui.skinnedCheckboxes) do UpdateCheckboxVisual(cb) end
+end
+
+------------------------------------------------------------------
 -- List rows
 ------------------------------------------------------------------
 local function RowClick(self)
@@ -100,7 +354,7 @@ local function CreateRow(i)
     btn.sel:Hide()
     btn.text = btn:CreateFontString(nil, "ARTWORK", "GameFontNormalSmall")
     btn.text:SetJustifyH("LEFT")
-    btn.text:SetWidth(LIST_W - 22)
+    btn.text:SetWidth(LIST_W - 12)
     btn:SetScript("OnClick", RowClick)
     return btn
 end
@@ -132,7 +386,7 @@ function WM:RefreshList()
             btn.text:SetTextColor(1, 0.82, 0)
             btn.sel:Hide()
         else
-            btn.text:SetPoint("LEFT", btn, "LEFT", 16, 0)
+            btn.text:SetPoint("LEFT", btn, "LEFT", 14, 0)
             btn.text:SetText(data.boss.displayName or data.boss.name)
             if self.db.notes[self:BossKey(data.boss)] then
                 btn.text:SetTextColor(0.55, 0.85, 1)
@@ -221,7 +475,7 @@ local function GetAbRow(i)
     return row
 end
 
-local function Bullets(lines, headColor)
+local function Bullets(lines)
     local out = {}
     for _, s in ipairs(lines) do
         if string.sub(s, 1, 3) == "## " then
@@ -233,14 +487,30 @@ local function Bullets(lines, headColor)
     return table.concat(out, "\n")
 end
 
+function WM:ScrollToSection(key)
+    if not ui.detailScroll then return end
+    local offset = ui.sectionOffsets[key]
+    if offset then
+        local target = math.max(0, offset - 4)
+        local max = ui.detailScroll:GetVerticalScrollRange() or 0
+        if target > max then target = max end
+        ui.detailScroll:SetVerticalScroll(target)
+    end
+end
+
 function WM:RefreshDetail()
     if not ui.main then return end
     for key, b in pairs(ui.roleButtons) do
         if key == self.db.role then b:Disable() else b:Enable() end
+        UpdateButtonVisual(b)
     end
     for key, b in pairs(ui.sizeButtons) do
         if key == self:GetSize() then b:Disable() else b:Enable() end
+        UpdateButtonVisual(b)
     end
+
+    ui.sectionOffsets = {}
+
     local boss = self.selected
     local used, usedAb = 0, 0
     local y = 0
@@ -259,8 +529,9 @@ function WM:RefreshDetail()
         y = y + fs:GetStringHeight() + (gap or 6)
     end
 
-    local function section(title, color, lines)
+    local function section(title, color, lines, anchorKey)
         if not lines or #lines == 0 then return end
+        if anchorKey then ui.sectionOffsets[anchorKey] = y end
         text(color .. title .. "|r", GameFontNormal, 2)
         text(Bullets(lines), GameFontHighlight, 10)
     end
@@ -283,13 +554,32 @@ function WM:RefreshDetail()
         if boss.tldr then
             text(C.tldr .. self.L["TL;DR"] .. "|r  " .. (self:Expand(boss.tldr) or boss.tldr), GameFontHighlight, 10)
         end
-        section(self.L["How to start the fight"], C.start, self:ExpandList(boss.start))
-        section(self.L["Strategy"], C.strat, self:ExpandList(boss.general))
-        if role == "ALL" or role == "TANK" then section(self.L["Tanks"], C.tank, self:ExpandList(boss.tank)) end
-        if role == "ALL" or role == "HEAL" then section(self.L["Healers"], C.heal, self:ExpandList(boss.heal)) end
-        if role == "ALL" or role == "DPS" then section("DPS", C.dps, self:ExpandList(boss.dps)) end
+
+        section(self.L["How to start the fight"], C.start, self:ExpandList(boss.start), "start")
+        section(self.L["Strategy"], C.strat, self:ExpandList(boss.general), "strat")
+
+        local hasRoleSection = false
+        if role == "ALL" or role == "TANK" then
+            if boss.tank and #boss.tank > 0 then
+                if not hasRoleSection then ui.sectionOffsets["roles"] = y; hasRoleSection = true end
+                section(self.L["Tanks"], C.tank, self:ExpandList(boss.tank))
+            end
+        end
+        if role == "ALL" or role == "HEAL" then
+            if boss.heal and #boss.heal > 0 then
+                if not hasRoleSection then ui.sectionOffsets["roles"] = y; hasRoleSection = true end
+                section(self.L["Healers"], C.heal, self:ExpandList(boss.heal))
+            end
+        end
+        if role == "ALL" or role == "DPS" then
+            if boss.dps and #boss.dps > 0 then
+                if not hasRoleSection then ui.sectionOffsets["roles"] = y; hasRoleSection = true end
+                section("DPS", C.dps, self:ExpandList(boss.dps))
+            end
+        end
 
         if boss.abilities and #boss.abilities > 0 then
+            ui.sectionOffsets["abil"] = y
             text(C.abil .. self.L["Boss abilities"] .. "|r  " .. C.grey .. self.L["(hover for the game tooltip, click to open it, shift-click to link in chat)"] .. "|r", GameFontNormal, 4)
             for _, ab in ipairs(boss.abilities) do
                 usedAb = usedAb + 1
@@ -317,9 +607,21 @@ function WM:RefreshDetail()
             y = y + 4
         end
 
-        section(self.L["Hard mode / Heroic - full explanation"], C.hard, self:ExpandList(boss.hard))
+        section(self.L["Hard mode / Heroic - full explanation"], C.hard, self:ExpandList(boss.hard), "hard")
     else
         text("", GameFontHighlight, 0)
+    end
+
+    for _, a in ipairs(ANCHORS) do
+        local btn = ui.anchorButtons[a.key]
+        if btn then
+            if ui.sectionOffsets[a.key] then
+                btn:Enable()
+            else
+                btn:Disable()
+            end
+            UpdateButtonVisual(btn)
+        end
     end
 
     for i = used + 1, #ui.fsPool do ui.fsPool[i]:Hide() end
@@ -409,7 +711,7 @@ function WM:SetSize(size)
 end
 
 ------------------------------------------------------------------
--- Personal notes (side box)
+-- Personal notes
 ------------------------------------------------------------------
 function WM:RefreshNotesButton()
     if not ui.notesButton then return end
@@ -458,29 +760,29 @@ local function CreateNotes()
     ui.notes = n
     n:SetWidth(270)
     n:SetHeight(360)
-    n:SetPoint("TOPLEFT", ui.main, "TOPRIGHT", -6, -30)
-    n:SetBackdrop(BACKDROP_DIALOG)
+    n:SetPoint("TOPLEFT", ui.main, "TOPRIGHT", 2, 0)
     n:SetClampedToScreen(true)
     n:Hide()
 
     ui.notesTitle = n:CreateFontString(nil, "ARTWORK", "GameFontNormal")
-    ui.notesTitle:SetPoint("TOPLEFT", n, "TOPLEFT", 20, -20)
-    ui.notesTitle:SetWidth(220)
+    ui.notesTitle:SetPoint("TOPLEFT", n, "TOPLEFT", 16, -16)
+    ui.notesTitle:SetWidth(230)
     ui.notesTitle:SetJustifyH("LEFT")
 
     local scroll = CreateFrame("ScrollFrame", "WrathMentorNotesScroll", n, "UIPanelScrollFrameTemplate")
-    scroll:SetPoint("TOPLEFT", n, "TOPLEFT", 20, -46)
-    scroll:SetWidth(210)
-    scroll:SetHeight(240)
+    scroll:SetPoint("TOPLEFT", n, "TOPLEFT", 16, -42)
+    scroll:SetWidth(222)
+    scroll:SetHeight(246)
     EnableWheel(scroll)
+    RegisterScrollBar(scroll, false)
 
     local edit = CreateFrame("EditBox", "WrathMentorNotesEdit", scroll)
     ui.notesEdit = edit
     edit:SetMultiLine(true)
     edit:SetAutoFocus(false)
     edit:SetFontObject(ChatFontNormal)
-    edit:SetWidth(206)
-    edit:SetHeight(240)
+    edit:SetWidth(214)
+    edit:SetHeight(246)
     edit:SetMaxLetters(4000)
     scroll:SetScrollChild(edit)
     edit:SetScript("OnEscapePressed", function(self) self:ClearFocus() end)
@@ -494,28 +796,32 @@ local function CreateNotes()
         for line in string.gmatch(text .. "\n", "(.-)\n") do
             lines = lines + math.max(1, math.ceil(string.len(line) / 30))
         end
-        self:SetHeight(math.max(240, lines * 14 + 20))
+        self:SetHeight(math.max(246, lines * 14 + 20))
     end)
 
     ui.notesStatus = n:CreateFontString(nil, "ARTWORK", "GameFontHighlightSmall")
-    ui.notesStatus:SetPoint("BOTTOMLEFT", n, "BOTTOMLEFT", 22, 52)
+    ui.notesStatus:SetPoint("BOTTOMLEFT", n, "BOTTOMLEFT", 16, 48)
 
     local save = CreateFrame("Button", "WrathMentorNotesSave", n, "UIPanelButtonTemplate")
-    save:SetWidth(90)
+    save:SetWidth(86)
     save:SetHeight(22)
-    save:SetPoint("BOTTOMLEFT", n, "BOTTOMLEFT", 20, 22)
+    save:SetPoint("BOTTOMLEFT", n, "BOTTOMLEFT", 16, 16)
     save:SetText(WM.L["Save"])
     save:SetScript("OnClick", function()
         edit:ClearFocus()
         WM:SaveNotes(false)
     end)
+    RegisterButton(save)
 
     local close = CreateFrame("Button", "WrathMentorNotesClose", n, "UIPanelButtonTemplate")
-    close:SetWidth(90)
+    close:SetWidth(86)
     close:SetHeight(22)
     close:SetPoint("LEFT", save, "RIGHT", 6, 0)
     close:SetText(WM.L["Close"])
     close:SetScript("OnClick", function() WM:ToggleNotes() end)
+    RegisterButton(close)
+
+    WM:ApplyTheme()
 end
 
 function WM:ToggleNotes()
@@ -531,7 +837,7 @@ function WM:ToggleNotes()
 end
 
 ------------------------------------------------------------------
--- Options synchronisation
+-- Options & Settings
 ------------------------------------------------------------------
 local function ScaleLabel(value)
     return string.format(WM.L["Popup size: %d%%"], math.floor((value or 1) * 100 + 0.5))
@@ -570,6 +876,7 @@ function WM:ApplyMainScale()
 end
 
 function WM:ApplySettings()
+    self:ApplyTheme()
     self:ApplyQuickScale()
     self:ApplyMainScale()
     self:UpdateMinimapButton()
@@ -590,7 +897,6 @@ local function CreateMain()
     f:SetMovable(true)
     f:EnableMouse(true)
     f:SetClampedToScreen(true)
-    f:SetBackdrop(BACKDROP_DIALOG)
     f:RegisterForDrag("LeftButton")
     f:SetScript("OnDragStart", function(self) self:StartMoving() end)
     f:SetScript("OnDragStop", function(self)
@@ -603,32 +909,42 @@ local function CreateMain()
     end)
     RestorePos(f, "mainPos", "CENTER", "CENTER", 0, 0)
     if f.SetResizable then f:SetResizable(true) end
-    if f.SetMinResize then f:SetMinResize(640, 420) end
+    if f.SetMinResize then f:SetMinResize(660, 420) end
     if f.SetMaxResize then f:SetMaxResize(1400, 900) end
     f:Hide()
     tinsert(UISpecialFrames, "WrathMentorFrame")
 
     local title = f:CreateFontString(nil, "ARTWORK", "GameFontNormalLarge")
-    title:SetPoint("TOP", f, "TOP", 0, -18)
+    title:SetPoint("TOP", f, "TOP", 0, -14)
     title:SetText(WM.L["Wrath Mentor - WotLK Raid Tactics"])
 
     local close = CreateFrame("Button", nil, f, "UIPanelCloseButton")
-    close:SetPoint("TOPRIGHT", f, "TOPRIGHT", -6, -6)
+    close:SetPoint("TOPRIGHT", f, "TOPRIGHT", -4, -4)
 
-    -- Left: raid / boss list
+    -- Left: raid / boss list (seamless 204px column)
     local listScroll = CreateFrame("ScrollFrame", "WrathMentorListScroll", f, "UIPanelScrollFrameTemplate")
-    listScroll:SetPoint("TOPLEFT", f, "TOPLEFT", 20, -50)
-    listScroll:SetPoint("BOTTOMLEFT", f, "BOTTOMLEFT", 20, 58)
+    listScroll:SetPoint("TOPLEFT", f, "TOPLEFT", 14, -44)
+    listScroll:SetPoint("BOTTOMLEFT", f, "BOTTOMLEFT", 14, 48)
     listScroll:SetWidth(LIST_W)
     local listChild = CreateFrame("Frame", nil, listScroll)
     listChild:SetWidth(LIST_W)
     listChild:SetHeight(10)
     listScroll:SetScrollChild(listChild)
     EnableWheel(listScroll)
+    RegisterScrollBar(listScroll, true)
     ui.listScroll = listScroll
     ui.listChild = listChild
 
-    -- Right: role buttons, size buttons, notes button
+    -- Vertical 1px separator line between columns
+    local sep = f:CreateTexture(nil, "BORDER")
+    sep:SetPoint("TOPLEFT", f, "TOPLEFT", 226, -40)
+    sep:SetPoint("BOTTOMLEFT", f, "BOTTOMLEFT", 226, 44)
+    sep:SetWidth(1)
+    sep:SetTexture(SOLID)
+    sep:SetVertexColor(0.25, 0.28, 0.38, 0.8)
+    f.separator = sep
+
+    -- Right Row 1: Role, Size, Notes, Copy (snug to the separator)
     local prev
     for i, r in ipairs(ROLES) do
         local b = CreateFrame("Button", "WrathMentorRole" .. r[1], f, "UIPanelButtonTemplate")
@@ -636,21 +952,23 @@ local function CreateMain()
         b:SetHeight(22)
         b:SetText(WM.L[r[2]])
         if i == 1 then
-            b:SetPoint("TOPLEFT", f, "TOPLEFT", 268, -50)
+            b:SetPoint("TOPLEFT", f, "TOPLEFT", 236, -44)
         else
-            b:SetPoint("LEFT", prev, "RIGHT", 2, 0)
+            b:SetPoint("LEFT", prev, "RIGHT", 3, 0)
         end
         local roleKey = r[1]
         b:SetScript("OnClick", function() WM:SetRole(roleKey) end)
+        RegisterButton(b)
         ui.roleButtons[roleKey] = b
         prev = b
     end
+
     for _, size in ipairs({ 10, 25 }) do
         local b = CreateFrame("Button", "WrathMentorSize" .. size, f, "UIPanelButtonTemplate")
         b:SetWidth(34)
         b:SetHeight(22)
         b:SetText(tostring(size))
-        b:SetPoint("LEFT", prev, "RIGHT", (size == 10) and 12 or 2, 0)
+        b:SetPoint("LEFT", prev, "RIGHT", (size == 10) and 10 or 3, 0)
         local s = size
         b:SetScript("OnClick", function() WM:SetSize(s) end)
         b:SetScript("OnEnter", function(self)
@@ -659,13 +977,15 @@ local function CreateMain()
             GameTooltip:Show()
         end)
         b:SetScript("OnLeave", function() GameTooltip:Hide() end)
+        RegisterButton(b)
         ui.sizeButtons[size] = b
         prev = b
     end
+
     local nb = CreateFrame("Button", "WrathMentorNotesButton", f, "UIPanelButtonTemplate")
-    nb:SetWidth(64)
+    nb:SetWidth(66)
     nb:SetHeight(22)
-    nb:SetPoint("LEFT", prev, "RIGHT", 12, 0)
+    nb:SetPoint("LEFT", prev, "RIGHT", 10, 0)
     nb:SetText(WM.L["Notes"])
     nb:SetScript("OnClick", function() WM:ToggleNotes() end)
     nb:SetScript("OnEnter", function(self)
@@ -675,10 +995,11 @@ local function CreateMain()
         GameTooltip:Show()
     end)
     nb:SetScript("OnLeave", function() GameTooltip:Hide() end)
+    RegisterButton(nb)
     ui.notesButton = nb
 
     local cb = CreateFrame("Button", "WrathMentorCopyButton", f, "UIPanelButtonTemplate")
-    cb:SetWidth(52)
+    cb:SetWidth(56)
     cb:SetHeight(22)
     cb:SetPoint("LEFT", nb, "RIGHT", 4, 0)
     cb:SetText(WM.L["Copy"])
@@ -690,24 +1011,45 @@ local function CreateMain()
         GameTooltip:Show()
     end)
     cb:SetScript("OnLeave", function() GameTooltip:Hide() end)
+    RegisterButton(cb)
     ui.copyButton = cb
 
-    -- Right: detail
+    -- Right Row 2: Anchor navigation buttons
+    local prevAnchor = nil
+    for _, a in ipairs(ANCHORS) do
+        local b = CreateFrame("Button", "WrathMentorAnchor" .. a.key, f, "UIPanelButtonTemplate")
+        b:SetWidth(a.w)
+        b:SetHeight(19)
+        b:SetText(WM.L[a.label])
+        if not prevAnchor then
+            b:SetPoint("TOPLEFT", f, "TOPLEFT", 236, -71)
+        else
+            b:SetPoint("LEFT", prevAnchor, "RIGHT", 4, 0)
+        end
+        local k = a.key
+        b:SetScript("OnClick", function() WM:ScrollToSection(k) end)
+        RegisterButton(b)
+        ui.anchorButtons[k] = b
+        prevAnchor = b
+    end
+
+    -- Right: detail pane
     local detailScroll = CreateFrame("ScrollFrame", "WrathMentorDetailScroll", f, "UIPanelScrollFrameTemplate")
-    detailScroll:SetPoint("TOPLEFT", f, "TOPLEFT", 268, -82)
-    detailScroll:SetPoint("BOTTOMRIGHT", f, "BOTTOMRIGHT", -20, 58)
+    detailScroll:SetPoint("TOPLEFT", f, "TOPLEFT", 236, -96)
+    detailScroll:SetPoint("BOTTOMRIGHT", f, "BOTTOMRIGHT", -22, 48)
     local detailChild = CreateFrame("Frame", nil, detailScroll)
     detailChild:SetWidth(DETAIL_W)
     detailChild:SetHeight(10)
     detailScroll:SetScrollChild(detailChild)
     EnableWheel(detailScroll)
+    RegisterScrollBar(detailScroll, false)
     ui.detailScroll = detailScroll
     ui.detailChild = detailChild
 
     -- Copy view
     local cf = CreateFrame("Frame", "WrathMentorCopyFrame", f)
-    cf:SetPoint("TOPLEFT", f, "TOPLEFT", 268, -82)
-    cf:SetPoint("BOTTOMRIGHT", f, "BOTTOMRIGHT", -20, 58)
+    cf:SetPoint("TOPLEFT", f, "TOPLEFT", 236, -96)
+    cf:SetPoint("BOTTOMRIGHT", f, "BOTTOMRIGHT", -22, 48)
     cf:Hide()
     ui.copyFrame = cf
 
@@ -720,15 +1062,17 @@ local function CreateMain()
         ui.copyEdit:SetFocus()
         ui.copyEdit:HighlightText()
     end)
+    RegisterButton(selAll)
 
     local hint = cf:CreateFontString(nil, "ARTWORK", "GameFontHighlightSmall")
     hint:SetPoint("LEFT", selAll, "RIGHT", 8, 0)
     hint:SetText(WM.L["Drag with the mouse to select part of the text, then press Ctrl+C."])
 
     local copyScroll = CreateFrame("ScrollFrame", "WrathMentorCopyScroll", cf, "UIPanelScrollFrameTemplate")
-    copyScroll:SetPoint("TOPLEFT", cf, "TOPLEFT", 0, -26)
+    copyScroll:SetPoint("TOPLEFT", cf, "TOPLEFT", 0, -24)
     copyScroll:SetPoint("BOTTOMRIGHT", cf, "BOTTOMRIGHT", 0, 0)
     EnableWheel(copyScroll)
+    RegisterScrollBar(copyScroll, false)
     ui.copyScroll = copyScroll
 
     local copyEdit = CreateFrame("EditBox", "WrathMentorCopyEdit", copyScroll)
@@ -755,11 +1099,14 @@ local function CreateMain()
     local send = CreateFrame("Button", "WrathMentorSendButton", f, "UIPanelButtonTemplate")
     send:SetWidth(120)
     send:SetHeight(22)
-    send:SetPoint("BOTTOMLEFT", f, "BOTTOMLEFT", 268, 20)
+    send:SetPoint("BOTTOMLEFT", f, "BOTTOMLEFT", 236, 16)
     send:SetText(WM.L["Send to chat"])
     send:SetScript("OnClick", function() WM:Send(WM.selected) end)
+    RegisterButton(send)
 
     local check = CreateFrame("CheckButton", "WrathMentorQuickCheck", f, "UICheckButtonTemplate")
+    check:SetWidth(18)
+    check:SetHeight(18)
     check:SetPoint("LEFT", send, "RIGHT", 14, 0)
     local checkText = getglobal("WrathMentorQuickCheckText")
     if checkText then checkText:SetText(WM.L["Popup when I target a boss"]) end
@@ -767,19 +1114,21 @@ local function CreateMain()
         WM.db.quick = self:GetChecked() and true or false
         WM:ApplySettings()
     end)
+    RegisterCheckbox(check)
     ui.quickCheck = check
 
     local settings = CreateFrame("Button", "WrathMentorSettingsButton", f, "UIPanelButtonTemplate")
     settings:SetWidth(90)
     settings:SetHeight(22)
-    settings:SetPoint("BOTTOMRIGHT", f, "BOTTOMRIGHT", -24, 20)
+    settings:SetPoint("BOTTOMRIGHT", f, "BOTTOMRIGHT", -22, 16)
     settings:SetText(WM.L["Settings"])
     settings:SetScript("OnClick", function() WM:OpenOptions() end)
+    RegisterButton(settings)
 
     local grip = CreateFrame("Button", "WrathMentorResizeGrip", f)
     grip:SetWidth(16)
     grip:SetHeight(16)
-    grip:SetPoint("BOTTOMRIGHT", f, "BOTTOMRIGHT", -4, 4)
+    grip:SetPoint("BOTTOMRIGHT", f, "BOTTOMRIGHT", -2, 2)
     grip:SetNormalTexture("Interface\\ChatFrame\\UI-ChatIM-SizeGrabber-Up")
     grip:SetHighlightTexture("Interface\\ChatFrame\\UI-ChatIM-SizeGrabber-Highlight")
     grip:SetPushedTexture("Interface\\ChatFrame\\UI-ChatIM-SizeGrabber-Down")
@@ -803,6 +1152,8 @@ local function CreateMain()
     f:SetScript("OnSizeChanged", function(self, w, h)
         WM:LayoutMain()
     end)
+
+    WM:ApplyTheme()
 end
 
 function WM:LayoutMain()
@@ -850,19 +1201,24 @@ function WM:ToggleMain()
 end
 
 ------------------------------------------------------------------
--- Quick popup
+-- Quick popup (with role buttons)
 ------------------------------------------------------------------
+function WM:SetQuickRole(roleKey)
+    self.db.quickRole = roleKey
+    if ui.quick and ui.quick:IsShown() and ui.quick.boss then
+        self:ShowQuick(ui.quick.boss)
+    end
+end
+
 local function CreateQuick()
     local q = CreateFrame("Frame", "WrathMentorQuick", UIParent)
     ui.quick = q
-    q:SetWidth(340)
-    q:SetHeight(120)
+    q:SetWidth(360)
+    q:SetHeight(130)
     q:SetFrameStrata("HIGH")
     q:SetMovable(true)
     q:EnableMouse(true)
     q:SetClampedToScreen(true)
-    q:SetBackdrop(BACKDROP_TOOLTIP)
-    q:SetBackdropColor(0, 0, 0, 0.88)
     q:RegisterForDrag("LeftButton")
     q:SetScript("OnDragStart", function(self) self:StartMoving() end)
     q:SetScript("OnDragStop", function(self)
@@ -874,27 +1230,47 @@ local function CreateQuick()
     q:Hide()
 
     q.title = q:CreateFontString(nil, "ARTWORK", "GameFontNormal")
-    q.title:SetPoint("TOPLEFT", q, "TOPLEFT", 12, -12)
-    q.title:SetWidth(290)
+    q.title:SetPoint("TOPLEFT", q, "TOPLEFT", 12, -10)
+    q.title:SetWidth(312)
     q.title:SetJustifyH("LEFT")
 
+    -- Role Buttons inside Quick Popup
+    local prevQR = nil
+    for _, qr in ipairs(QUICK_ROLES) do
+        local b = CreateFrame("Button", "WrathMentorQuickRole" .. qr.key, q, "UIPanelButtonTemplate")
+        b:SetWidth(qr.w)
+        b:SetHeight(18)
+        b:SetText(WM.L[qr.label])
+        if not prevQR then
+            b:SetPoint("TOPLEFT", q, "TOPLEFT", 12, -28)
+        else
+            b:SetPoint("LEFT", prevQR, "RIGHT", 4, 0)
+        end
+        local k = qr.key
+        b:SetScript("OnClick", function() WM:SetQuickRole(k) end)
+        RegisterButton(b)
+        ui.quickRoleButtons[k] = b
+        prevQR = b
+    end
+
     q.body = q:CreateFontString(nil, "ARTWORK", "GameFontHighlightSmall")
-    q.body:SetPoint("TOPLEFT", q, "TOPLEFT", 12, -32)
-    q.body:SetWidth(316)
+    q.body:SetPoint("TOPLEFT", q, "TOPLEFT", 12, -52)
+    q.body:SetWidth(336)
     q.body:SetJustifyH("LEFT")
     q.body:SetJustifyV("TOP")
 
     local close = CreateFrame("Button", nil, q, "UIPanelCloseButton")
-    close:SetPoint("TOPRIGHT", q, "TOPRIGHT", 2, 2)
+    close:SetPoint("TOPRIGHT", q, "TOPRIGHT", -2, -2)
 
     local full = CreateFrame("Button", nil, q, "UIPanelButtonTemplate")
     full:SetWidth(90)
     full:SetHeight(20)
-    full:SetPoint("BOTTOMRIGHT", q, "BOTTOMRIGHT", -10, 10)
+    full:SetPoint("BOTTOMRIGHT", q, "BOTTOMRIGHT", -10, 8)
     full:SetText(WM.L["Full guide"])
     full:SetScript("OnClick", function()
         if q.boss then WM:ShowMain(q.boss) end
     end)
+    RegisterButton(full)
 
     local send = CreateFrame("Button", nil, q, "UIPanelButtonTemplate")
     send:SetWidth(90)
@@ -904,6 +1280,9 @@ local function CreateQuick()
     send:SetScript("OnClick", function()
         if q.boss then WM:Send(q.boss) end
     end)
+    RegisterButton(send)
+
+    WM:ApplyTheme()
 end
 
 function WM:ShowQuick(boss)
@@ -911,11 +1290,22 @@ function WM:ShowQuick(boss)
     local q = ui.quick
     q.boss = boss
     self.quickBoss = boss
+
+    local currentQRole = self.db.quickRole or "TLDR"
+    for k, btn in pairs(ui.quickRoleButtons) do
+        if k == currentQRole then
+            btn:Disable()
+        else
+            btn:Enable()
+        end
+        UpdateButtonVisual(btn)
+    end
+
     local bName = boss.displayName or boss.name
     local sizeStr = string.format(self.L["%d-man"], self:GetSize())
     q.title:SetText(bName .. "  |cff9d9d9d(" .. sizeStr .. ")|r")
     q.body:SetText(self:GetQuickText(boss))
-    q:SetHeight(q.body:GetStringHeight() + 70)
+    q:SetHeight(q.body:GetStringHeight() + 86)
     q:Show()
 end
 
@@ -1078,6 +1468,15 @@ end
 ------------------------------------------------------------------
 local CHECK_OPTIONS = {
     {
+        labelKey = "Use dark interface style (Flat/Dark)",
+        get = function() return WM.db.theme ~= "classic" end,
+        set = function(v)
+            WM.db.theme = v and "dark" or "classic"
+            WM:ApplyTheme()
+            WM:RefreshDetail()
+        end,
+    },
+    {
         labelKey = "Show the minimap button",
         get = function() return not WM.db.minimap.hide end,
         set = function(v) WM.db.minimap.hide = not v end,
@@ -1123,6 +1522,7 @@ local function CreateOptions()
             opt.set(self:GetChecked() and true or false)
             WM:ApplySettings()
         end)
+        RegisterCheckbox(cb)
         ui.optChecks[#ui.optChecks + 1] = cb
         y = y - 28
     end
@@ -1168,6 +1568,7 @@ local function CreateOptions()
         local boss = WM.selected or WM.raids[WM.raidOrder[1]].bosses[1]
         WM:ShowQuick(boss)
     end)
+    RegisterButton(test)
 
     local reset = CreateFrame("Button", "WrathMentorResetButton", p, "UIPanelButtonTemplate")
     reset:SetWidth(150)
@@ -1175,6 +1576,7 @@ local function CreateOptions()
     reset:SetPoint("LEFT", test, "RIGHT", 8, 0)
     reset:SetText(WM.L["Reset position/size"])
     reset:SetScript("OnClick", function() WM:HandleSlash("reset") end)
+    RegisterButton(reset)
 
     p.refresh = function() WM:RefreshOptions() end
     p.default = function() WM:ResetOptions() end
