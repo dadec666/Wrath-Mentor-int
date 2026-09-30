@@ -1,10 +1,10 @@
--- Wrath Mentor - Core (v2.3.1)
+-- Wrath Mentor - Core (v2.3.2 Spell Tags & Safe Chat Edition)
 -- Client: WoW 3.3.5a (Interface 30300). Lua 5.1, no modern APIs.
 
 WrathMentor = WrathMentor or {}
 local WM = WrathMentor
 
-WM.version = "2.3.1"
+WM.version = "2.3.2"
 WM.raids = {}        -- raids[id] = { id, name, zones, bosses, src }
 WM.raidOrder = {}    -- display order
 WM.nameIndex = {}    -- lowercase NPC name -> boss entry
@@ -73,6 +73,40 @@ function WM:AddRaid(id, name, zones, bosses, src)
                 local locAlias = self.L[alias]
                 if locAlias and locAlias ~= alias then
                     self.nameIndex[lower(locAlias)] = boss
+                end
+            end
+        end
+    end
+end
+
+function WM:RegisterTactics(raidId, data)
+    local raid = self.raids[raidId]
+    if not raid or not data then return end
+    for _, boss in ipairs(raid.bosses) do
+        local t = data[boss.name] or (boss.displayName and data[boss.displayName])
+        if t then
+            if t.tldr then boss.tldr = t.tldr end
+            if t.start then boss.start = t.start end
+            if t.general then boss.general = t.general end
+            if t.tank then boss.tank = t.tank end
+            if t.heal then boss.heal = t.heal end
+            if t.dps then boss.dps = t.dps end
+            if t.hard then boss.hard = t.hard end
+            if t.abilities and boss.abilities then
+                for i, abTrans in ipairs(t.abilities) do
+                    local matched = false
+                    if abTrans.name then
+                        for _, orig in ipairs(boss.abilities) do
+                            if orig.name and lower(orig.name) == lower(abTrans.name) then
+                                orig.desc = abTrans.desc or orig.desc
+                                matched = true
+                                break
+                            end
+                        end
+                    end
+                    if not matched and boss.abilities[i] then
+                        boss.abilities[i].desc = abTrans.desc or boss.abilities[i].desc
+                    end
                 end
             end
         end
@@ -167,40 +201,7 @@ function WM:FindBoss(query)
 end
 
 ------------------------------------------------------------------
--- 10 / 25 man text expansion
-------------------------------------------------------------------
-function WM:GetSize()
-    return (self.db and self.db.size) or 25
-end
-
-function WM:Expand(line)
-    if type(line) ~= "string" then return nil end
-    local size = self:GetSize()
-    local tag, rest = string.match(line, "^%[(%d+)%]%s*(.*)$")
-    if tag then
-        if tonumber(tag) ~= size then return nil end
-        line = rest
-    end
-    line = string.gsub(line, "#{([^/}]*)/([^}]*)}", function(a, b)
-        if size == 10 then return a end
-        return b
-    end)
-    return line
-end
-
-function WM:ExpandList(list)
-    local out = {}
-    if list then
-        for _, l in ipairs(list) do
-            local e = self:Expand(l)
-            if e and e ~= "" then out[#out + 1] = e end
-        end
-    end
-    return out
-end
-
-------------------------------------------------------------------
--- Spell links
+-- Spell Links, Tag Parser & Cache Warming
 ------------------------------------------------------------------
 local FALLBACK_ICON = "Interface\\Icons\\INV_Misc_QuestionMark"
 
@@ -246,6 +247,74 @@ function WM:GetSpellIcon(ab)
     return ab.icon or FALLBACK_ICON
 end
 
+-- Safe spell resolver with cache pre-warming for {spell:ID} tags
+function WM:SafeSpellLink(spellID)
+    spellID = tonumber(spellID)
+    if not spellID then return nil end
+
+    -- 1. Warm client spell cache
+    local name = GetSpellInfo(spellID)
+    if not name or name == "" then
+        return nil, nil
+    end
+
+    -- 2. Try official client link
+    local link = GetSpellLink and GetSpellLink(spellID)
+    if link and link ~= "" then
+        return link, name
+    end
+
+    -- 3. Fallback construct standard 3.3.5a hyperlink
+    link = string.format("|cff71d5ff|Hspell:%d|h[%s]|h|r", spellID, name)
+    return link, name
+end
+
+-- Replaces {spell:ID} tags based on context (ui, chat, plain)
+function WM:FormatSpellTags(text, mode)
+    if type(text) ~= "string" or text == "" then return text end
+    return (string.gsub(text, "{spell:(%d+)}", function(idStr)
+        local id = tonumber(idStr)
+        local link, name = WM:SafeSpellLink(id)
+        if mode == "plain" then
+            return name and ("[" .. name .. "]") or ("[Spell " .. idStr .. "]")
+        elseif mode == "chat" or mode == "ui" or not mode then
+            if link then
+                return link
+            elseif name then
+                return "|cff71d5ff[" .. name .. "]|r"
+            else
+                return "[Spell " .. idStr .. "]"
+            end
+        end
+        return link or ("[Spell " .. idStr .. "]")
+    end))
+end
+
+-- Pre-caches all spell IDs for the given boss entry
+function WM:PreloadBossSpells(boss)
+    if not boss then return end
+    if boss.abilities then
+        for _, ab in ipairs(boss.abilities) do self:ResolveSpell(ab) end
+    end
+    local function scan(lines)
+        if not lines then return end
+        for _, l in ipairs(lines) do
+            for id in string.gmatch(l, "{spell:(%d+)}") do
+                GetSpellInfo(tonumber(id))
+            end
+        end
+    end
+    if boss.tldr then
+        for id in string.gmatch(boss.tldr, "{spell:(%d+)}") do GetSpellInfo(tonumber(id)) end
+    end
+    scan(boss.start)
+    scan(boss.general)
+    scan(boss.tank)
+    scan(boss.heal)
+    scan(boss.dps)
+    scan(boss.hard)
+end
+
 function WM:CheckLinks()
     local total, linked, missing = 0, 0, {}
     for _, id in ipairs(self.raidOrder) do
@@ -264,7 +333,41 @@ function WM:CheckLinks()
 end
 
 ------------------------------------------------------------------
--- Plain text version of a boss (v2.3.1 Statuses Separation)
+-- 10 / 25 man text expansion
+------------------------------------------------------------------
+function WM:GetSize()
+    return (self.db and self.db.size) or 25
+end
+
+function WM:Expand(line, mode)
+    if type(line) ~= "string" then return nil end
+    local size = self:GetSize()
+    local tag, rest = string.match(line, "^%[(%d+)%]%s*(.*)$")
+    if tag then
+        if tonumber(tag) ~= size then return nil end
+        line = rest
+    end
+    line = string.gsub(line, "#{([^/}]*)/([^}]*)}", function(a, b)
+        if size == 10 then return a end
+        return b
+    end)
+    line = self:FormatSpellTags(line, mode or "ui")
+    return line
+end
+
+function WM:ExpandList(list, mode)
+    local out = {}
+    if list then
+        for _, l in ipairs(list) do
+            local e = self:Expand(l, mode)
+            if e and e ~= "" then out[#out + 1] = e end
+        end
+    end
+    return out
+end
+
+------------------------------------------------------------------
+-- Plain text version of a boss (Copy view)
 ------------------------------------------------------------------
 function WM:BuildPlainText(boss)
     local raid = self.raids[boss.raidId]
@@ -291,13 +394,13 @@ function WM:BuildPlainText(boss)
     add(bossName .. " - " .. raidName .. " (" .. sizeStr .. ")")
     if boss.tldr then
         add("")
-        add(self.L["TL;DR: "] .. (self:Expand(boss.tldr) or boss.tldr))
+        add(self.L["TL;DR: "] .. (self:Expand(boss.tldr, "plain") or boss.tldr))
     end
-    section(self.L["HOW TO START THE FIGHT"], self:ExpandList(boss.start))
-    section(self.L["STRATEGY"], self:ExpandList(boss.general))
-    if role == "ALL" or role == "TANK" then section(self.L["TANKS"], self:ExpandList(boss.tank)) end
-    if role == "ALL" or role == "HEAL" then section(self.L["HEALERS"], self:ExpandList(boss.heal)) end
-    if role == "ALL" or role == "DPS" then section("DPS", self:ExpandList(boss.dps)) end
+    section(self.L["HOW TO START THE FIGHT"], self:ExpandList(boss.start, "plain"))
+    section(self.L["STRATEGY"], self:ExpandList(boss.general, "plain"))
+    if role == "ALL" or role == "TANK" then section(self.L["TANKS"], self:ExpandList(boss.tank, "plain")) end
+    if role == "ALL" or role == "HEAL" then section(self.L["HEALERS"], self:ExpandList(boss.heal, "plain")) end
+    if role == "ALL" or role == "DPS" then section("DPS", self:ExpandList(boss.dps, "plain")) end
 
     if boss.abilities and #boss.abilities > 0 then
         local plain, statuses = {}, {}
@@ -313,7 +416,7 @@ function WM:BuildPlainText(boss)
             add(self.L["BOSS ABILITIES"])
             for _, ab in ipairs(plain) do
                 local abName = ab.resolvedName or self.L[ab.name] or ab.name
-                add("- " .. abName .. ": " .. (self:Expand(ab.desc) or ""))
+                add("- " .. abName .. ": " .. (self:Expand(ab.desc, "plain") or ""))
             end
         end
         if #statuses > 0 then
@@ -322,12 +425,12 @@ function WM:BuildPlainText(boss)
             for _, ab in ipairs(statuses) do
                 local abName = ab.resolvedName or self.L[ab.name] or ab.name
                 local kindLabel = string.upper(self.L[ab.kind] or ab.kind)
-                add("- " .. abName .. " (" .. kindLabel .. "): " .. (self:Expand(ab.desc) or ""))
+                add("- " .. abName .. " (" .. kindLabel .. "): " .. (self:Expand(ab.desc, "plain") or ""))
             end
         end
     end
 
-    section(self.L["HARD MODE / HEROIC"], self:ExpandList(boss.hard))
+    section(self.L["HARD MODE / HEROIC"], self:ExpandList(boss.hard, "plain"))
     return table.concat(out, "\n")
 end
 
@@ -338,32 +441,32 @@ function WM:GetQuickText(boss)
     if not boss then return "" end
     local qRole = (self.db and self.db.quickRole) or "TLDR"
     if qRole == "TANK" and boss.tank and #boss.tank > 0 then
-        local list = self:ExpandList(boss.tank)
+        local list = self:ExpandList(boss.tank, "ui")
         if #list > 0 then
             local out = {}
             for _, s in ipairs(list) do out[#out + 1] = "• " .. s end
             return table.concat(out, "\n")
         end
     elseif qRole == "HEAL" and boss.heal and #boss.heal > 0 then
-        local list = self:ExpandList(boss.heal)
+        local list = self:ExpandList(boss.heal, "ui")
         if #list > 0 then
             local out = {}
             for _, s in ipairs(list) do out[#out + 1] = "• " .. s end
             return table.concat(out, "\n")
         end
     elseif qRole == "DPS" and boss.dps and #boss.dps > 0 then
-        local list = self:ExpandList(boss.dps)
+        local list = self:ExpandList(boss.dps, "ui")
         if #list > 0 then
             local out = {}
             for _, s in ipairs(list) do out[#out + 1] = "• " .. s end
             return table.concat(out, "\n")
         end
     end
-    return self:Expand(boss.tldr) or boss.tldr or ""
+    return self:Expand(boss.tldr, "ui") or boss.tldr or ""
 end
 
 ------------------------------------------------------------------
--- Sending to chat
+-- Sending to chat (Link-Aware splitting and non-destructive colors)
 ------------------------------------------------------------------
 local queue, acc = {}, 0
 local qf = CreateFrame("Frame")
@@ -378,23 +481,70 @@ qf:SetScript("OnUpdate", function(self, elapsed)
     end
 end)
 
-local function SplitMessage(text, maxlen)
-    local parts = {}
-    while string.len(text) > maxlen do
-        local cut = maxlen
-        while cut > 1 and string.sub(text, cut, cut) ~= " " do cut = cut - 1 end
-        if cut <= 1 then cut = maxlen end
-        parts[#parts + 1] = string.sub(text, 1, cut)
-        text = string.sub(text, cut + 1)
-    end
-    if text ~= "" then parts[#parts + 1] = text end
-    return parts
-end
-
-local function StripColors(s)
+-- Strips cosmetic colors while preserving complete Blizzard hyperlinks
+local function StripNonLinkColors(s)
+    local links = {}
+    s = string.gsub(s, "(|c%x%x%x%x%x%x%x%x|H.-|h.-|h|r)", function(link)
+        links[#links + 1] = link
+        return "\001LINK" .. #links .. "\002"
+    end)
     s = string.gsub(s, "|c%x%x%x%x%x%x%x%x", "")
     s = string.gsub(s, "|r", "")
+    s = string.gsub(s, "\001LINK(%d+)\002", function(idx)
+        return links[tonumber(idx)] or ""
+    end)
     return s
+end
+
+-- Splits message at safe word boundaries without splitting inside hyperlinks
+local function SplitMessage(text, maxlen)
+    maxlen = maxlen or 240
+    local parts = {}
+    while string.len(text) > maxlen do
+        local ranges = {}
+        local init = 1
+        while true do
+            local s, e = string.find(text, "|c%x%x%x%x%x%x%x%x|H.-|h.-|h|r", init)
+            if not s then break end
+            ranges[#ranges + 1] = { s = s, e = e }
+            init = e + 1
+        end
+
+        local cut = maxlen
+        for _, r in ipairs(ranges) do
+            if cut >= r.s and cut <= r.e then
+                cut = r.s - 1
+                break
+            end
+        end
+
+        local spaceCut = cut
+        while spaceCut > 1 and string.sub(text, spaceCut, spaceCut) ~= " " do
+            for _, r in ipairs(ranges) do
+                if spaceCut >= r.s and spaceCut <= r.e then
+                    spaceCut = r.s
+                    break
+                end
+            end
+            spaceCut = spaceCut - 1
+        end
+
+        if spaceCut > 1 then
+            cut = spaceCut
+        end
+
+        if cut <= 1 then
+            cut = maxlen
+        end
+
+        local part = string.sub(text, 1, cut)
+        parts[#parts + 1] = string.gsub(part, "%s+$", "")
+        text = string.gsub(string.sub(text, cut + 1), "^%s+", "")
+    end
+    if text ~= "" then
+        parts[#parts + 1] = text
+    end
+    return parts
 end
 
 function WM:Send(boss, channel)
@@ -402,6 +552,8 @@ function WM:Send(boss, channel)
         self:Print(self.L["No boss selected."])
         return
     end
+    self:PreloadBossSpells(boss)
+
     if not channel then
         if GetNumRaidMembers() > 0 then
             channel = "RAID"
@@ -414,7 +566,7 @@ function WM:Send(boss, channel)
     local sizeStr = string.format(self.L["%d-man"], self:GetSize())
     local lines = {}
     lines[#lines + 1] = "[Mentor] " .. bossName .. " (" .. sizeStr .. ") - " .. self.L["Strategy"]
-    for _, s in ipairs(self:ExpandList(boss.general)) do
+    for _, s in ipairs(self:ExpandList(boss.general, "chat")) do
         if string.sub(s, 1, 3) == "## " then
             lines[#lines + 1] = "-- " .. string.sub(s, 4) .. " --"
         else
@@ -427,7 +579,8 @@ function WM:Send(boss, channel)
         return
     end
     for _, l in ipairs(lines) do
-        for _, part in ipairs(SplitMessage(StripColors(l), 240)) do
+        local cleanLine = StripNonLinkColors(l)
+        for _, part in ipairs(SplitMessage(cleanLine, 240)) do
             queue[#queue + 1] = { text = part, chan = channel }
         end
     end
