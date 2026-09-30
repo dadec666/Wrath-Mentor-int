@@ -117,19 +117,19 @@ local function RegisterButton(btn)
     ui.skinnedButtons[#ui.skinnedButtons + 1] = btn
 
     btn:HookScript("OnEnter", function(self)
-        if WM.db.theme ~= "classic" and self:IsEnabled() == 1 then
-            self:SetBackdropBorderColor(1, 0.82, 0, 1) -- Golden hover
+        if WM.db and WM.db.theme == "dark" and self:IsEnabled() == 1 then
+            self:SetBackdropBorderColor(1, 0.82, 0, 1)
         end
     end)
     btn:HookScript("OnLeave", function(self)
-        if WM.db.theme ~= "classic" and self:IsEnabled() == 1 then
+        if WM.db and WM.db.theme == "dark" and self:IsEnabled() == 1 then
             self:SetBackdropBorderColor(0.32, 0.35, 0.45, 1)
         end
     end)
 end
 
 local function UpdateButtonVisual(btn)
-    local isDark = (WM.db.theme ~= "classic")
+    local isDark = (WM.db and WM.db.theme == "dark")
     local nt = btn:GetNormalTexture()
     local pt = btn:GetPushedTexture()
     local dt = btn:GetDisabledTexture()
@@ -149,7 +149,6 @@ local function UpdateButtonVisual(btn)
             btn:SetBackdropColor(0.12, 0.14, 0.18, 0.95)
             btn:SetBackdropBorderColor(0.32, 0.35, 0.45, 1)
         else
-            -- Active / Selected Tab
             btn:SetBackdropColor(0.18, 0.38, 0.65, 0.95)
             btn:SetBackdropBorderColor(0.40, 0.70, 1.0, 1)
         end
@@ -183,7 +182,7 @@ local function RegisterScrollBar(sf, isLeftList)
 end
 
 local function UpdateScrollBarVisual(entry)
-    local isDark = (WM.db.theme ~= "classic")
+    local isDark = (WM.db and WM.db.theme == "dark")
     local sf = entry.sf
     local isLeft = entry.isLeft
     local name = sf:GetName()
@@ -194,7 +193,6 @@ local function UpdateScrollBarVisual(entry)
     local thumb = sb:GetThumbTexture()
 
     if isDark then
-        -- Suppress Blizzard arrow buttons permanently
         if sb.up then
             sb.up:Hide()
             sb.up:SetAlpha(0)
@@ -265,7 +263,7 @@ local function RegisterCheckbox(cb)
 end
 
 local function UpdateCheckboxVisual(cb)
-    local isDark = (WM.db.theme ~= "classic")
+    local isDark = (WM.db and WM.db.theme == "dark")
     if isDark then
         local normal = cb:GetNormalTexture()
         if normal then normal:SetAlpha(0) end
@@ -285,7 +283,7 @@ local function UpdateCheckboxVisual(cb)
 end
 
 function WM:ApplyTheme()
-    local isDark = (self.db.theme ~= "classic")
+    local isDark = (self.db and self.db.theme == "dark")
     local backdrop = isDark and BACKDROP_FLAT_DARK or BACKDROP_CLASSIC
 
     if ui.main then
@@ -1469,7 +1467,7 @@ end
 local CHECK_OPTIONS = {
     {
         labelKey = "Use dark interface style (Flat/Dark)",
-        get = function() return WM.db.theme ~= "classic" end,
+        get = function() return WM.db and WM.db.theme == "dark" end,
         set = function(v)
             WM.db.theme = v and "dark" or "classic"
             WM:ApplyTheme()
