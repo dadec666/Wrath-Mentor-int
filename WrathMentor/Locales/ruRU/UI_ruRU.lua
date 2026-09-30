@@ -286,4 +286,7 @@ WM:RegisterLocale("ruRU", {
     ["debuff"] = "дебафф",
     ["Buff"] = "Бафф",
     ["Debuff"] = "Дебафф",
+
+    -- Новые строки v2.3.2 (Buffs & Debuffs)
+    ["Sections:"] = "Разделы:",
 })
