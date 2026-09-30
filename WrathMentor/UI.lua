@@ -1,4 +1,4 @@
--- Wrath Mentor - UI (v2.3 Flat/Dark Edition)
+-- Wrath Mentor - UI (v2.3.1 Flat/Dark & Statuses Edition)
 local WM = WrathMentor
 
 local ROW_H = 18
@@ -78,6 +78,8 @@ local C = {
     grey = "|cff9d9d9d",
     white = "|cffffffff",
     sub = "|cff8fd8ff",
+    buff = "|cff33ff99",
+    debuff = "|cffff7070",
 }
 
 ------------------------------------------------------------------
@@ -588,10 +590,19 @@ function WM:RefreshDetail()
                 row.btn:SetWidth(dw - 8)
                 row.icon:SetTexture(WM:GetSpellIcon(ab))
                 local abDisplayName = ab.resolvedName or self.L[ab.name] or ab.name
+
+                -- Status Badge (Buff / Debuff)
+                local kindTag = ""
+                if ab.kind == "buff" then
+                    kindTag = " " .. C.buff .. "[" .. (self.L["Buff"] or "Buff") .. "]|r"
+                elseif ab.kind == "debuff" then
+                    kindTag = " " .. C.debuff .. "[" .. (self.L["Debuff"] or "Debuff") .. "]|r"
+                end
+
                 if WM:ResolveSpell(ab) then
-                    row.btn.text:SetText("|cff71d5ff[" .. abDisplayName .. "]|r")
+                    row.btn.text:SetText("|cff71d5ff[" .. abDisplayName .. "]|r" .. kindTag)
                 else
-                    row.btn.text:SetText(C.white .. abDisplayName .. "|r")
+                    row.btn.text:SetText(C.white .. abDisplayName .. "|r" .. kindTag)
                 end
                 row.btn:Show()
                 y = y + 18
