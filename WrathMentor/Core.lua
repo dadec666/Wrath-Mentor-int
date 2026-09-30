@@ -13,7 +13,7 @@ WM.selected = nil    -- boss currently shown in the main window
 local DEFAULTS = {
     role = "ALL",                -- ALL | TANK | HEAL | DPS
     size = 25,                   -- 10 or 25
-    theme = "dark",              -- "dark" (Flat/Dark) | "classic" (Blizzard Dialog)
+    theme = "classic",           -- "classic" (Blizzard Dialog по умолчанию) | "dark" (Flat/Dark)
     quickRole = "TLDR",          -- TLDR | TANK | HEAL | DPS
     quick = true,                -- popup when you target a boss
     quickRaidOnly = true,        -- only show the popup inside raid instances
@@ -494,6 +494,7 @@ function WM:HandleSlash(msg)
         self.db.minimap.angle = DEFAULTS.minimap.angle
         self.db.mainWidth = DEFAULTS.mainWidth
         self.db.mainHeight = DEFAULTS.mainHeight
+        self.db.theme = DEFAULTS.theme
         self:ResetPositions()
         self:Print(self.L["Positions and window size reset."])
     else
