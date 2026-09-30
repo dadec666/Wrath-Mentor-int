@@ -1,10 +1,10 @@
--- Wrath Mentor - Core (v2)
+-- Wrath Mentor - Core (v2.3.1)
 -- Client: WoW 3.3.5a (Interface 30300). Lua 5.1, no modern APIs.
 
 WrathMentor = WrathMentor or {}
 local WM = WrathMentor
 
-WM.version = "2.2.4"
+WM.version = "2.3.1"
 WM.raids = {}        -- raids[id] = { id, name, zones, bosses, src }
 WM.raidOrder = {}    -- display order
 WM.nameIndex = {}    -- lowercase NPC name -> boss entry
@@ -13,7 +13,7 @@ WM.selected = nil    -- boss currently shown in the main window
 local DEFAULTS = {
     role = "ALL",                -- ALL | TANK | HEAL | DPS
     size = 25,                   -- 10 or 25
-    theme = "classic",           -- "classic" (Blizzard Dialog по умолчанию) | "dark" (Flat/Dark)
+    theme = "classic",           -- "classic" (по умолчанию) | "dark"
     quickRole = "TLDR",          -- TLDR | TANK | HEAL | DPS
     quick = true,                -- popup when you target a boss
     quickRaidOnly = true,        -- only show the popup inside raid instances
@@ -264,7 +264,7 @@ function WM:CheckLinks()
 end
 
 ------------------------------------------------------------------
--- Plain text version of a boss
+-- Plain text version of a boss (v2.3.1 Statuses Separation)
 ------------------------------------------------------------------
 function WM:BuildPlainText(boss)
     local raid = self.raids[boss.raidId]
@@ -298,14 +298,35 @@ function WM:BuildPlainText(boss)
     if role == "ALL" or role == "TANK" then section(self.L["TANKS"], self:ExpandList(boss.tank)) end
     if role == "ALL" or role == "HEAL" then section(self.L["HEALERS"], self:ExpandList(boss.heal)) end
     if role == "ALL" or role == "DPS" then section("DPS", self:ExpandList(boss.dps)) end
+
     if boss.abilities and #boss.abilities > 0 then
-        add("")
-        add(self.L["BOSS ABILITIES"])
+        local plain, statuses = {}, {}
         for _, ab in ipairs(boss.abilities) do
-            local abName = ab.resolvedName or self.L[ab.name] or ab.name
-            add("- " .. abName .. ": " .. (self:Expand(ab.desc) or ""))
+            if ab.kind == "buff" or ab.kind == "debuff" then
+                statuses[#statuses + 1] = ab
+            else
+                plain[#plain + 1] = ab
+            end
+        end
+        if #plain > 0 then
+            add("")
+            add(self.L["BOSS ABILITIES"])
+            for _, ab in ipairs(plain) do
+                local abName = ab.resolvedName or self.L[ab.name] or ab.name
+                add("- " .. abName .. ": " .. (self:Expand(ab.desc) or ""))
+            end
+        end
+        if #statuses > 0 then
+            add("")
+            add(self.L["BUFFS & DEBUFFS"])
+            for _, ab in ipairs(statuses) do
+                local abName = ab.resolvedName or self.L[ab.name] or ab.name
+                local kindLabel = string.upper(self.L[ab.kind] or ab.kind)
+                add("- " .. abName .. " (" .. kindLabel .. "): " .. (self:Expand(ab.desc) or ""))
+            end
         end
     end
+
     section(self.L["HARD MODE / HEROIC"], self:ExpandList(boss.hard))
     return table.concat(out, "\n")
 end
