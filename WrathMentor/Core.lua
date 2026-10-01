@@ -174,7 +174,6 @@ function WM:ResetOptions()
     self.db.mainAlpha = d.mainAlpha
     self.db.theme = d.theme
     self.db.quickRole = d.quickRole
-    self.db.modelsEnabled = d.modelsEnabled
     self.db.announce = d.announce
     self.db.announceRaidOnly = d.announceRaidOnly
     self.db.sendContent = d.sendContent
@@ -727,11 +726,6 @@ function WM:HandleSlash(msg)
         self:Print(string.format(self.L["Boss popup %s."], state))
         if not self.db.quick then self:HideQuick() end
         self:RefreshOptions()
-    elseif cmd == "models" then
-        self.db.modelsEnabled = not self.db.modelsEnabled
-        local state = self.db.modelsEnabled and self.L["enabled"] or self.L["disabled"]
-        self:Print(string.format(self.L["3D Model view %s."], state))
-        self:ApplySettings()
     elseif cmd == "announce" then
         self.db.announce = not self.db.announce
         local state = self.db.announce and self.L["enabled"] or self.L["disabled"]
