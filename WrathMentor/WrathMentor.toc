@@ -4,7 +4,7 @@
 ## Notes: In-game tactics for every WotLK raid boss (10/25-man, hard modes, ability links, live 3D model preview, chat announcements, personal notes, resizable window). Type /wm
 ## Notes-ruRU: Внутриигровой справочник тактик для всех рейдовых боссов WotLK (10/25 чел., хардмоды, интерактивные ссылки, живые 3D-модели боссов, личные заметки, настраиваемое окно). Команда: /wm
 ## Author: Saranwrap (Fork & ruRU by dadec666)
-## Version: 2.15.3
+## Version: 2.15.4
 ## SavedVariables: WrathMentorDB
 
 Localization.lua
