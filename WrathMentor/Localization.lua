@@ -63,3 +63,15 @@ function WM:RegisterTactics(locale, raidId, bossList)
         end
     end
 end
+
+-- Базовый системный словарь меток (английский / системный)
+WrathMentor.RAID_TARGET_MAP = WrathMentor.RAID_TARGET_MAP or {
+    rt1 = 1, star = 1,
+    rt2 = 2, circle = 2, coin = 2,
+    rt3 = 3, diamond = 3,
+    rt4 = 4, triangle = 4,
+    rt5 = 5, moon = 5,
+    rt6 = 6, square = 6,
+    rt7 = 7, cross = 7, x = 7,
+    rt8 = 8, skull = 8,
+}

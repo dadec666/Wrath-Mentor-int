@@ -299,4 +299,45 @@ WM:RegisterLocale("ruRU", {
     ["3D Model view %s."] = "Отображение 3D-моделей %s.",
     ["Chat announcement %s."] = "Оповещение в чат %s.",
     ["Open %s guide"] = "Открыть тактику на %s",
+
+    -- Modern UI v3 Strings
+    ["Search boss..."] = "Поиск босса...",
+    ["Tactics"] = "Тактика",
+    ["Abilities"] = "Способности",
+    ["Personal Notes"] = "Личные заметки",
+    ["Personal notes for %s"] = "Личные заметки по боссу: %s",
+    ["Type your private notes here. They are saved automatically."] = "Ваши личные заметки по боссу. Сохраняются автоматически.",
+
+    -- Card UI & Micro-Send
+    ["To chat"] = "В чат",
+    ["Send this section to chat"] = "Отправить этот раздел в чат",
+    ["Sends only this phase or role without spamming the entire guide."] = "Отправляет только эту конкретную фазу или роль без спама всей тактики.",
+
+    -- Raid Target Markers Display
+    ["Star"] = "Звезда",
+    ["Circle"] = "Круг",
+    ["Diamond"] = "Ромб",
+    ["Triangle"] = "Треугольник",
+    ["Moon"] = "Луна",
+    ["Square"] = "Квадрат",
+    ["Cross"] = "Крест",
+    ["Skull"] = "Череп",
 })
+
+-- Регистрация русских тегов меток в словаре аддона
+WrathMentor.RAID_TARGET_MAP = WrathMentor.RAID_TARGET_MAP or {}
+
+local ruTargetTags = {
+    ["звезда"] = 1,
+    ["круг"] = 2,
+    ["ромб"] = 3,
+    ["треугольник"] = 4, ["треугол"] = 4,
+    ["луна"] = 5, ["месяц"] = 5,
+    ["квадрат"] = 6,
+    ["крест"] = 7,
+    ["череп"] = 8,
+}
+
+for tag, index in pairs(ruTargetTags) do
+    WrathMentor.RAID_TARGET_MAP[tag] = index
+end

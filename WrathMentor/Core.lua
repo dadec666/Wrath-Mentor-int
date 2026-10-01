@@ -33,6 +33,34 @@ local DEFAULTS = {
 }
 WM.DEFAULTS = DEFAULTS
 
+-- Защищенная инициализация: не перезаписывать данные из файлов локализации
+WM.RAID_TARGET_MAP = WM.RAID_TARGET_MAP or {}
+local defaultTargetMap = {
+    rt1 = 1, star = 1,
+    rt2 = 2, circle = 2, coin = 2,
+    rt3 = 3, diamond = 3,
+    rt4 = 4, triangle = 4,
+    rt5 = 5, moon = 5,
+    rt6 = 6, square = 6,
+    rt7 = 7, cross = 7, x = 7,
+    rt8 = 8, skull = 8,
+}
+for k, v in pairs(defaultTargetMap) do
+    if not WM.RAID_TARGET_MAP[k] then
+        WM.RAID_TARGET_MAP[k] = v
+    end
+end
+
+WM.RAID_TARGET_NAMES = {
+    [1] = "Star",
+    [2] = "Circle",
+    [3] = "Diamond",
+    [4] = "Triangle",
+    [5] = "Moon",
+    [6] = "Square",
+    [7] = "Cross",
+    [8] = "Skull",
+}
 local ROLE_KEY = { TANK = "tank", HEAL = "heal", DPS = "dps" }
 
 local function lower(s)
@@ -123,7 +151,16 @@ function WM:BossKey(boss)
 end
 
 function WM:Print(msg)
-    DEFAULT_CHAT_FRAME:AddMessage("|cff33ccffWrath Mentor:|r " .. tostring(msg))
+    msg = tostring(msg or "")
+    -- Для локального вывода в AddMessage преобразуем {череп}, {skull} и т.д. в нативные текстуры клиента
+    msg = string.gsub(msg, "{([^}]+)}", function(tag)
+        local rtIndex = WM.RAID_TARGET_MAP and (WM.RAID_TARGET_MAP[tag] or WM.RAID_TARGET_MAP[lower(tag)])
+        if rtIndex then
+            return "|TInterface\\TargetingFrame\\UI-RaidTargetingIcon_" .. rtIndex .. ":0|t"
+        end
+        return "{" .. tag .. "}"
+    end)
+    DEFAULT_CHAT_FRAME:AddMessage("|cff33ccffWrath Mentor:|r " .. msg)
 end
 
 ------------------------------------------------------------------
@@ -297,9 +334,11 @@ function WM:SafeSpellLink(spellID)
     return link, name
 end
 
-function WM:FormatSpellTags(text, mode)
+function WM:FormatTags(text, mode)
     if type(text) ~= "string" or text == "" then return text end
-    return (string.gsub(text, "{spell:(%d+)}", function(idStr)
+
+    -- 1. Спеллы: {spell:ID}
+    text = string.gsub(text, "{spell:(%d+)}", function(idStr)
         local id = tonumber(idStr)
         local link, name = WM:SafeSpellLink(id)
         if mode == "plain" then
@@ -309,7 +348,33 @@ function WM:FormatSpellTags(text, mode)
         else
             return name and ("|cff71d5ff[" .. name .. "]|r") or ("[Spell " .. idStr .. "]")
         end
-    end))
+    end)
+
+    -- 2. Рейдовые метки
+    text = string.gsub(text, "{([^}]+)}", function(tag)
+        local rtIndex = WM.RAID_TARGET_MAP and (WM.RAID_TARGET_MAP[tag] or WM.RAID_TARGET_MAP[lower(tag)])
+        if rtIndex then
+            if mode == "chat" then
+                -- Для чата 3.3.5a берем нативную константу клиента (в ruRU это "череп", в enUS - "skull")
+                local blizzTag = _G["RAID_TARGET_" .. rtIndex]
+                if blizzTag then
+                    return "{" .. lower(blizzTag) .. "}"
+                end
+                return "{" .. tag .. "}"
+            else
+                local rawName = WM.RAID_TARGET_NAMES[rtIndex] or ("RT" .. rtIndex)
+                local localizedName = WM.L and WM.L[rawName] or rawName
+                if mode == "plain" then
+                    return "[" .. localizedName .. "]"
+                else
+                    return "|cffffd100[" .. localizedName .. "]|r"
+                end
+            end
+        end
+        return "{" .. tag .. "}"
+    end)
+
+    return text
 end
 
 -- Splits prose lines into tokens for the interactive inline word-by-word UI renderer
@@ -320,7 +385,7 @@ function WM:TokenizeLine(line, boss)
 
     local lastPos = 1
     while true do
-        local s, e, spellIdStr = string.find(line, "{spell:(%d+)}", lastPos)
+        local s, e, tagContent = string.find(line, "{([^}]+)}", lastPos)
         if not s then
             local remainder = string.sub(line, lastPos)
             for w in string.gmatch(remainder, "%S+") do
@@ -336,31 +401,47 @@ function WM:TokenizeLine(line, boss)
             end
         end
 
-        local spellId = tonumber(spellIdStr)
-        local link, spellName = WM:SafeSpellLink(spellId)
-        local abMatch = nil
-        if boss and boss.abilities then
-            for _, ab in ipairs(boss.abilities) do
-                local ids = ab.ids or (ab.id and { ab.id })
-                if ids then
-                    for _, id in ipairs(ids) do
-                        if id == spellId then
-                            abMatch = ab
-                            break
+        local spellIdStr = string.match(tagContent, "^spell:(%d+)$")
+        local rtIndex = self.RAID_TARGET_MAP and (self.RAID_TARGET_MAP[tagContent] or self.RAID_TARGET_MAP[lower(tagContent)])
+
+        if spellIdStr then
+            local spellId = tonumber(spellIdStr)
+            local link, spellName = WM:SafeSpellLink(spellId)
+            local abMatch = nil
+            if boss and boss.abilities then
+                for _, ab in ipairs(boss.abilities) do
+                    local ids = ab.ids or (ab.id and { ab.id })
+                    if ids then
+                        for _, id in ipairs(ids) do
+                            if id == spellId then
+                                abMatch = ab
+                                break
+                            end
                         end
                     end
+                    if abMatch then break end
                 end
-                if abMatch then break end
+            end
+            if not abMatch then
+                abMatch = { spell = spellId, name = spellName or ("Spell " .. spellIdStr), checked = true, icon = select(3, GetSpellInfo(spellId)) }
+            end
+
+            tokens[#tokens + 1] = {
+                text = "[" .. (spellName or ("Spell " .. spellIdStr)) .. "]",
+                ability = abMatch,
+            }
+        elseif rtIndex then
+            tokens[#tokens + 1] = {
+                text = "{rt" .. rtIndex .. "}",
+                raidTarget = rtIndex,
+            }
+        else
+            local rawTag = string.sub(line, s, e)
+            for w in string.gmatch(rawTag, "%S+") do
+                tokens[#tokens + 1] = { text = w }
             end
         end
-        if not abMatch then
-            abMatch = { spell = spellId, name = spellName or ("Spell " .. spellIdStr), checked = true, icon = select(3, GetSpellInfo(spellId)) }
-        end
 
-        tokens[#tokens + 1] = {
-            text = "[" .. (spellName or ("Spell " .. spellIdStr)) .. "]",
-            ability = abMatch,
-        }
         lastPos = e + 1
     end
     return tokens
@@ -425,7 +506,7 @@ function WM:Expand(line, mode)
         return b
     end)
     if mode ~= "raw" then
-        line = self:FormatSpellTags(line, mode or "ui")
+        line = self:FormatTags(line, mode or "ui")
     end
     return line
 end
@@ -619,6 +700,48 @@ local function SplitMessage(text, maxlen)
     end
     if text ~= "" then parts[#parts + 1] = text end
     return parts
+end
+
+function WM:SendSection(boss, sectionTitle, lines, channel)
+    if not boss or not lines or #lines == 0 then return end
+    self:PreloadBossSpells(boss)
+
+    if not channel then
+        if GetNumRaidMembers() > 0 then
+            channel = "RAID"
+        elseif GetNumPartyMembers() > 0 then
+            channel = "PARTY"
+        end
+    end
+
+    local bName = boss.displayName or boss.name
+    local sizeStr = string.format(self.L["%d-man"], self:GetSize())
+    local outLines = {}
+    
+    outLines[#outLines + 1] = "[Mentor] " .. bName .. " (" .. sizeStr .. ") - " .. (sectionTitle or "")
+    for _, l in ipairs(lines) do
+        local expanded = self:Expand(l, "chat")
+        if expanded and expanded ~= "" then
+            if string.sub(expanded, 1, 3) == "## " then
+                outLines[#outLines + 1] = "-- " .. string.sub(expanded, 4) .. " --"
+            else
+                outLines[#outLines + 1] = "• " .. expanded
+            end
+        end
+    end
+
+    if not channel then
+        for _, l in ipairs(outLines) do self:Print(l) end
+        return
+    end
+
+    for _, l in ipairs(outLines) do
+        local cleanLine = StripNonLinkColors(l)
+        for _, part in ipairs(SplitMessage(cleanLine, 240)) do
+            queue[#queue + 1] = { text = part, chan = channel }
+        end
+    end
+    qf:Show()
 end
 
 function WM:Send(boss, channel)

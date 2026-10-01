@@ -1,51 +1,71 @@
--- Wrath Mentor - UI (v2.15.3 Clean & Interactive Edition)
+-- Wrath Mentor - Modern UI (v3 Card-Based, Micro-Send, Markers, Segments & Modern HUD)
 local WM = WrathMentor
 
 local ROW_H = 18
-local LIST_W = 204
-local DETAIL_W = 440
+local LIST_W = 206
+local DETAIL_W = 480
 local SOLID = "Interface\\Buttons\\WHITE8X8"
 
 local ui = {
     rows = {},
     roleButtons = {},
     sizeButtons = {},
+    tabButtons = {},
     anchorButtons = {},
     quickRoleButtons = {},
     sendContentButtons = {},
     sectionOffsets = {},
+    cardPool = {},
     fsPool = {},
     abPool = {},
     buffPool = {},
     wordPool = {},
     wordBtnPool = {},
+    iconPool = {},
     optChecks = {},
     skinnedButtons = {},
     skinnedScrollBars = {},
     skinnedCheckboxes = {},
+    activeTab = "tactics",
 }
 WM.ui = ui
 
 local ROLES = {
-    { "ALL", "All", 44 },
-    { "TANK", "Tank", 48 },
-    { "HEAL", "Healer", 52 },
-    { "DPS", "DPS", 44 },
+    { "ALL", "All", 46 },
+    { "TANK", "Tank", 50 },
+    { "HEAL", "Healer", 56 },
+    { "DPS", "DPS", 46 },
+}
+
+local TABS = {
+    { key = "tactics",   label = "Tactics",   w = 80 },
+    { key = "abilities", label = "Abilities", w = 96 },
+    { key = "notes",     label = "Notes",     w = 74 },
 }
 
 local ANCHORS = {
-    { key = "start", label = "Start", w = 58 },
-    { key = "strat", label = "Strategy", w = 68 },
-    { key = "roles", label = "Roles", w = 54 },
-    { key = "abil",  label = "Abilities", w = 84 },
-    { key = "hard",  label = "Hard mode", w = 76 },
+    { key = "start", label = "Start", w = 54 },
+    { key = "strat", label = "Strategy", w = 66 },
+    { key = "roles", label = "Roles", w = 52 },
+    { key = "hard",  label = "Hard mode", w = 72 },
 }
 
 local QUICK_ROLES = {
-    { key = "TLDR", label = "TL;DR", w = 52 },
+    { key = "TLDR", label = "TL;DR", w = 54 },
     { key = "TANK", label = "Tank",  w = 48 },
     { key = "HEAL", label = "Healer", w = 56 },
     { key = "DPS",  label = "DPS",   w = 44 },
+}
+
+local RAID_TARGET_COORDS = {
+    { 0.00, 0.25, 0.00, 0.25 }, -- 1: Star
+    { 0.25, 0.50, 0.00, 0.25 }, -- 2: Circle
+    { 0.50, 0.75, 0.00, 0.25 }, -- 3: Diamond
+    { 0.75, 1.00, 0.00, 0.25 }, -- 4: Triangle
+    { 0.00, 0.25, 0.25, 0.50 }, -- 5: Moon
+    { 0.25, 0.50, 0.25, 0.50 }, -- 6: Square
+    { 0.50, 0.75, 0.25, 0.50 }, -- 7: Cross
+    { 0.75, 1.00, 0.25, 0.50 }, -- 8: Skull
 }
 
 local BACKDROP_CLASSIC = {
@@ -69,6 +89,20 @@ local BACKDROP_BUTTON_DARK = {
     insets = { left = 2, right = 2, top = 2, bottom = 2 },
 }
 
+local BACKDROP_SEGMENT_CONTAINER = {
+    bgFile = "Interface\\Tooltips\\UI-Tooltip-Background",
+    edgeFile = "Interface\\Tooltips\\UI-Tooltip-Border",
+    tile = true, tileSize = 16, edgeSize = 10,
+    insets = { left = 1, right = 1, top = 1, bottom = 1 },
+}
+
+local BACKDROP_CARD = {
+    bgFile = "Interface\\Tooltips\\UI-Tooltip-Background",
+    edgeFile = "Interface\\Tooltips\\UI-Tooltip-Border",
+    tile = true, tileSize = 16, edgeSize = 10,
+    insets = { left = 3, right = 3, top = 3, bottom = 3 },
+}
+
 local C = {
     title = "|cffffd100",
     tldr = "|cff33ff99",
@@ -87,8 +121,14 @@ local C = {
     sub = "|cff8fd8ff",
 }
 
+local function lower(s)
+    s = s or ""
+    if strlower then return strlower(s) end
+    return string.lower(s)
+end
+
 ------------------------------------------------------------------
--- Helpers
+-- Helpers & Position Storage
 ------------------------------------------------------------------
 local function SavePos(frame, key)
     local point, _, relPoint, x, y = frame:GetPoint()
@@ -118,8 +158,42 @@ local function EnableWheel(sf)
 end
 
 ------------------------------------------------------------------
--- Skinning Engine
+-- Skinning & Segment Visual Engine
 ------------------------------------------------------------------
+local function UpdateSegmentButtonVisual(btn, isSelected)
+    if not btn then return end
+    local isDark = (WM.db and WM.db.theme == "dark")
+    btn:SetBackdrop(BACKDROP_SEGMENT_CONTAINER)
+    local fs = btn.text
+
+    if isSelected then
+        if isDark then
+            btn:SetBackdropColor(0.20, 0.45, 0.85, 0.95)
+            btn:SetBackdropBorderColor(0.38, 0.68, 1.0, 1)
+        else
+            btn:SetBackdropColor(0.18, 0.40, 0.75, 0.95)
+            btn:SetBackdropBorderColor(0.30, 0.60, 0.95, 1)
+        end
+        if fs then fs:SetTextColor(1, 1, 1) end
+    else
+        btn:SetBackdropColor(0, 0, 0, 0)
+        btn:SetBackdropBorderColor(0, 0, 0, 0)
+        if fs then fs:SetTextColor(0.70, 0.72, 0.80) end
+    end
+end
+
+local function CreateSegmentBtn(name, parent, w, h, text, onClick)
+    local b = CreateFrame("Button", name, parent)
+    b:SetWidth(w)
+    b:SetHeight(h)
+    b:SetHighlightTexture("Interface\\QuestFrame\\UI-QuestTitleHighlight", "ADD")
+    b.text = b:CreateFontString(nil, "ARTWORK", "GameFontNormalSmall")
+    b.text:SetPoint("CENTER", b, "CENTER", 0, 0)
+    b.text:SetText(text)
+    b:SetScript("OnClick", onClick)
+    return b
+end
+
 local function RegisterButton(btn)
     ui.skinnedButtons[#ui.skinnedButtons + 1] = btn
     btn:HookScript("OnEnter", function(self)
@@ -176,6 +250,7 @@ local function RegisterScrollBar(sf, isLeftList)
     local track = sb:CreateTexture(nil, "BACKGROUND")
     track:SetAllPoints(sb)
     track:SetTexture(SOLID)
+    track:Hide()
     sb.track = track
 end
 
@@ -247,30 +322,55 @@ function WM:ApplyTheme()
             ui.main:SetBackdropColor(0.08, 0.09, 0.12, 0.96)
             ui.main:SetBackdropBorderColor(0.25, 0.28, 0.38, 1)
             if ui.main.separator then ui.main.separator:Show() end
-            if ui.main.sepGroup then ui.main.sepGroup:Show() end
         else
             ui.main:SetBackdropColor(1, 1, 1, 1)
             ui.main:SetBackdropBorderColor(1, 1, 1, 1)
             if ui.main.separator then ui.main.separator:Hide() end
-            if ui.main.sepGroup then ui.main.sepGroup:Hide() end
         end
     end
 
-    if ui.notes then
-        ui.notes:SetBackdrop(backdrop)
+    local segContainers = { ui.roleSegment, ui.sizeSegment, ui.tabSegment, ui.quickRoleSegment }
+    for _, sc in ipairs(segContainers) do
+        if sc then
+            sc:SetBackdrop(BACKDROP_SEGMENT_CONTAINER)
+            if isDark then
+                sc:SetBackdropColor(0.05, 0.06, 0.08, 0.85)
+                sc:SetBackdropBorderColor(0.20, 0.23, 0.32, 0.90)
+            else
+                sc:SetBackdropColor(0, 0, 0, 0.45)
+                sc:SetBackdropBorderColor(0.40, 0.40, 0.40, 0.80)
+            end
+        end
+    end
+
+    if ui.searchBox then
         if isDark then
-            ui.notes:SetBackdropColor(0.08, 0.09, 0.12, 0.96)
-            ui.notes:SetBackdropBorderColor(0.25, 0.28, 0.38, 1)
+            ui.searchBox:SetBackdrop(BACKDROP_BUTTON_DARK)
+            ui.searchBox:SetBackdropColor(0.05, 0.06, 0.08, 0.95)
+            ui.searchBox:SetBackdropBorderColor(0.25, 0.28, 0.38, 1)
         else
-            ui.notes:SetBackdropColor(1, 1, 1, 1)
-            ui.notes:SetBackdropBorderColor(1, 1, 1, 1)
+            ui.searchBox:SetBackdrop(BACKDROP_FLAT_DARK)
+            ui.searchBox:SetBackdropColor(0, 0, 0, 0.6)
+            ui.searchBox:SetBackdropBorderColor(0.6, 0.6, 0.6, 1)
+        end
+    end
+
+    if ui.notesInnerBox then
+        if isDark then
+            ui.notesInnerBox:SetBackdrop(BACKDROP_BUTTON_DARK)
+            ui.notesInnerBox:SetBackdropColor(0.05, 0.06, 0.08, 0.95)
+            ui.notesInnerBox:SetBackdropBorderColor(0.25, 0.28, 0.38, 1)
+        else
+            ui.notesInnerBox:SetBackdrop(BACKDROP_FLAT_DARK)
+            ui.notesInnerBox:SetBackdropColor(0, 0, 0, 0.4)
+            ui.notesInnerBox:SetBackdropBorderColor(0.5, 0.5, 0.5, 1)
         end
     end
 
     if ui.quick then
         ui.quick:SetBackdrop(backdrop)
         if isDark then
-            ui.quick:SetBackdropColor(0.08, 0.09, 0.12, 0.96)
+            ui.quick:SetBackdropColor(0.06, 0.07, 0.10, 0.94)
             ui.quick:SetBackdropBorderColor(0.25, 0.28, 0.38, 1)
         else
             ui.quick:SetBackdropColor(0, 0, 0, 0.88)
@@ -278,13 +378,29 @@ function WM:ApplyTheme()
         end
     end
 
+    for _, card in ipairs(ui.cardPool) do
+        card:SetBackdrop(BACKDROP_CARD)
+        if isDark then
+            card:SetBackdropColor(0.06, 0.07, 0.10, 0.80)
+            card:SetBackdropBorderColor(0.18, 0.21, 0.29, 0.85)
+        else
+            card:SetBackdropColor(0, 0, 0, 0.38)
+            card:SetBackdropBorderColor(0.35, 0.35, 0.35, 0.6)
+        end
+    end
+
     for _, btn in ipairs(ui.skinnedButtons) do UpdateButtonVisual(btn) end
     for _, entry in ipairs(ui.skinnedScrollBars) do UpdateScrollBarVisual(entry) end
     for _, cb in ipairs(ui.skinnedCheckboxes) do UpdateCheckboxVisual(cb) end
+
+    for k, b in pairs(ui.roleButtons) do UpdateSegmentButtonVisual(b, k == self.db.role) end
+    for s, b in pairs(ui.sizeButtons) do UpdateSegmentButtonVisual(b, s == self:GetSize()) end
+    for k, b in pairs(ui.tabButtons) do UpdateSegmentButtonVisual(b, k == ui.activeTab) end
+    for k, b in pairs(ui.quickRoleButtons) do UpdateSegmentButtonVisual(b, k == (self.db.quickRole or "TLDR")) end
 end
 
 ------------------------------------------------------------------
--- List Rows
+-- Sidebar List & Live Search Filter
 ------------------------------------------------------------------
 local function RowClick(self)
     local d = self.data
@@ -309,23 +425,48 @@ local function CreateRow(i)
     btn.sel:Hide()
     btn.text = btn:CreateFontString(nil, "ARTWORK", "GameFontNormalSmall")
     btn.text:SetJustifyH("LEFT")
-    btn.text:SetWidth(LIST_W - 12)
+    btn.text:SetWidth(LIST_W - 14)
     btn:SetScript("OnClick", RowClick)
     return btn
 end
 
 function WM:RefreshList()
     if not ui.main then return end
+    local q = lower(WM.searchQuery or "")
     local rows = {}
+
     for _, id in ipairs(self.raidOrder) do
         local raid = self.raids[id]
-        rows[#rows + 1] = { raid = raid }
-        if not self.collapsed[id] then
-            for _, boss in ipairs(raid.bosses) do
-                rows[#rows + 1] = { boss = boss }
+        local matchingBosses = {}
+        for _, boss in ipairs(raid.bosses) do
+            if q == "" then
+                matchingBosses[#matchingBosses + 1] = boss
+            else
+                local bName = lower(boss.displayName or boss.name)
+                local rawName = lower(boss.name)
+                local matched = string.find(bName, q, 1, true) or string.find(rawName, q, 1, true)
+                if not matched and boss.aliases then
+                    for _, a in ipairs(boss.aliases) do
+                        if string.find(lower(a), q, 1, true) then matched = true; break end
+                    end
+                end
+                if matched then
+                    matchingBosses[#matchingBosses + 1] = boss
+                end
+            end
+        end
+
+        if #matchingBosses > 0 then
+            local isCollapsed = (q == "") and self.collapsed[id]
+            rows[#rows + 1] = { raid = raid, matchCount = #matchingBosses }
+            if not isCollapsed then
+                for _, boss in ipairs(matchingBosses) do
+                    rows[#rows + 1] = { boss = boss }
+                end
             end
         end
     end
+
     for i, data in ipairs(rows) do
         local btn = ui.rows[i]
         if not btn then
@@ -335,7 +476,7 @@ function WM:RefreshList()
         btn.data = data
         btn.text:ClearAllPoints()
         if data.raid then
-            local mark = self.collapsed[data.raid.id] and "+ " or "- "
+            local mark = ((q == "") and self.collapsed[data.raid.id]) and "+ " or "- "
             btn.text:SetPoint("LEFT", btn, "LEFT", 2, 0)
             btn.text:SetText(mark .. data.raid.name)
             btn.text:SetTextColor(1, 0.82, 0)
@@ -352,12 +493,13 @@ function WM:RefreshList()
         end
         btn:Show()
     end
+
     for i = #rows + 1, #ui.rows do ui.rows[i]:Hide() end
     ui.listChild:SetHeight(math.max(#rows * ROW_H, 10))
 end
 
 ------------------------------------------------------------------
--- Ability Tooltips & Handlers
+-- Ability Tooltip & Click Handlers
 ------------------------------------------------------------------
 local function AbilityEnter(self)
     local ab = self.ab
@@ -390,8 +532,52 @@ local function AbilityClick(self, button)
 end
 
 ------------------------------------------------------------------
--- Pools
+-- Dynamic Object Pools
 ------------------------------------------------------------------
+local function GetRaidIcon(i)
+    local tex = ui.iconPool[i]
+    if not tex then
+        tex = ui.detailChild:CreateTexture(nil, "OVERLAY")
+        tex:SetTexture("Interface\\TargetingFrame\\UI-RaidTargetingIcons")
+        tex:SetWidth(15)
+        tex:SetHeight(15)
+        ui.iconPool[i] = tex
+    end
+    return tex
+end
+
+local function GetCard(i)
+    local card = ui.cardPool[i]
+    if not card then
+        card = CreateFrame("Frame", nil, ui.detailChild)
+        card:SetFrameLevel(ui.detailChild:GetFrameLevel() + 1)
+        card:SetBackdrop(BACKDROP_CARD)
+
+        local title = card:CreateFontString(nil, "ARTWORK", "GameFontNormal")
+        title:SetPoint("TOPLEFT", card, "TOPLEFT", 10, -8)
+        title:SetJustifyH("LEFT")
+        card.title = title
+
+        local sendBtn = CreateFrame("Button", nil, card, "UIPanelButtonTemplate")
+        sendBtn:SetWidth(50)
+        sendBtn:SetHeight(18)
+        sendBtn:SetPoint("TOPRIGHT", card, "TOPRIGHT", -8, -5)
+        sendBtn:SetText(WM.L["To chat"] or "В чат")
+        sendBtn:SetScript("OnEnter", function(self)
+            GameTooltip:SetOwner(self, "ANCHOR_TOP")
+            GameTooltip:AddLine(WM.L["Send this section to chat"] or "Отправить этот раздел в чат")
+            GameTooltip:AddLine(WM.L["Sends only this phase or role without spamming the entire guide."] or "Отправляет только эту фазу или роль.", 1, 1, 1)
+            GameTooltip:Show()
+        end)
+        sendBtn:SetScript("OnLeave", function() GameTooltip:Hide() end)
+        RegisterButton(sendBtn)
+        card.sendBtn = sendBtn
+
+        ui.cardPool[i] = card
+    end
+    return card
+end
+
 local function GetFS(i)
     local fs = ui.fsPool[i]
     if not fs then
@@ -417,6 +603,7 @@ local function GetWordBtn(i)
     local row = ui.wordBtnPool[i]
     if not row then
         local btn = CreateFrame("Button", nil, ui.detailChild)
+        btn:SetFrameLevel(ui.detailChild:GetFrameLevel() + 3)
         btn:SetHeight(15)
         btn:SetHighlightTexture("Interface\\QuestFrame\\UI-QuestTitleHighlight", "ADD")
         local txt = btn:CreateFontString(nil, "ARTWORK", "GameFontHighlight")
@@ -434,17 +621,17 @@ end
 
 local function CreateAbRow(parent)
     local btn = CreateFrame("Button", nil, parent)
-    btn:SetHeight(16)
+    btn:SetHeight(18)
     btn:SetWidth(DETAIL_W - 8)
     btn:SetHighlightTexture("Interface\\QuestFrame\\UI-QuestTitleHighlight", "ADD")
     local icon = btn:CreateTexture(nil, "ARTWORK")
-    icon:SetWidth(16)
-    icon:SetHeight(16)
+    icon:SetWidth(18)
+    icon:SetHeight(18)
     icon:SetPoint("LEFT", btn, "LEFT", 0, 0)
     icon:SetTexCoord(0.08, 0.92, 0.08, 0.92)
     local row = { icon = icon }
     btn.text = btn:CreateFontString(nil, "ARTWORK", "GameFontNormal")
-    btn.text:SetPoint("LEFT", icon, "RIGHT", 4, 0)
+    btn.text:SetPoint("LEFT", icon, "RIGHT", 6, 0)
     btn.text:SetJustifyH("LEFT")
     btn:SetScript("OnEnter", AbilityEnter)
     btn:SetScript("OnLeave", AbilityLeave)
@@ -459,7 +646,7 @@ end
 local function GetAbRow(i)
     local row = ui.abPool[i]
     if not row then
-        row = CreateAbRow(ui.detailChild)
+        row = CreateAbRow(ui.abilitiesChild)
         ui.abPool[i] = row
     end
     return row
@@ -468,17 +655,48 @@ end
 local function GetBuffRow(i)
     local row = ui.buffPool[i]
     if not row then
-        row = CreateAbRow(ui.detailChild)
+        row = CreateAbRow(ui.abilitiesChild)
         ui.buffPool[i] = row
     end
     return row
 end
 
 ------------------------------------------------------------------
--- Detail Pane & Inline Flow Renderer
+-- Tab Controller & Anchors
 ------------------------------------------------------------------
+function WM:SetTab(tabKey)
+    if ui.activeTab == "notes" and ui.notesDirty then
+        self:SaveNotes(true)
+    end
+    ui.activeTab = tabKey
+
+    for k, btn in pairs(ui.tabButtons) do
+        UpdateSegmentButtonVisual(btn, k == tabKey)
+    end
+
+    if ui.copyMode then self:SetCopyMode(false) end
+
+    if ui.detailScroll then ui.detailScroll:Hide() end
+    if ui.abilitiesScroll then ui.abilitiesScroll:Hide() end
+    if ui.notesFrame then ui.notesFrame:Hide() end
+
+    if tabKey == "tactics" then
+        if ui.detailScroll then ui.detailScroll:Show() end
+        if ui.anchorContainer then ui.anchorContainer:Show() end
+        self:RefreshDetail()
+    elseif tabKey == "abilities" then
+        if ui.abilitiesScroll then ui.abilitiesScroll:Show() end
+        if ui.anchorContainer then ui.anchorContainer:Hide() end
+        self:RefreshAbilitiesTab()
+    elseif tabKey == "notes" then
+        if ui.notesFrame then ui.notesFrame:Show() end
+        if ui.anchorContainer then ui.anchorContainer:Hide() end
+        self:LoadNotes()
+    end
+end
+
 function WM:ScrollToSection(key)
-    if not ui.detailScroll then return end
+    if ui.activeTab ~= "tactics" or not ui.detailScroll then return end
     local offset = ui.sectionOffsets[key]
     if offset then
         local target = math.max(0, offset - 4)
@@ -488,41 +706,220 @@ function WM:ScrollToSection(key)
     end
 end
 
+------------------------------------------------------------------
+-- Content Renderers: Card-Based Tactics Tab
+------------------------------------------------------------------
 function WM:RefreshDetail()
-    if not ui.main then return end
-    for key, b in pairs(ui.roleButtons) do
-        if key == self.db.role then b:Disable() else b:Enable() end
-        UpdateButtonVisual(b)
-    end
-    for key, b in pairs(ui.sizeButtons) do
-        if key == self:GetSize() then b:Disable() else b:Enable() end
-        UpdateButtonVisual(b)
-    end
+    if not ui.main or ui.activeTab ~= "tactics" then return end
+
+    for key, b in pairs(ui.roleButtons) do UpdateSegmentButtonVisual(b, key == self.db.role) end
+    for key, b in pairs(ui.sizeButtons) do UpdateSegmentButtonVisual(b, key == self:GetSize()) end
 
     ui.sectionOffsets = {}
     local boss = self.selected
-    local used, usedAb, usedBuff, usedWord, usedWordBtn = 0, 0, 0, 0, 0
-    local y = 0
+    local usedCard, usedFS, usedWord, usedWordBtn, usedIcon = 0, 0, 0, 0, 0
+    local y = 2
     local dw = (ui.detailScroll and ui.detailScroll:GetWidth()) or DETAIL_W
     if not dw or dw <= 0 then dw = DETAIL_W end
+    local cardW = dw - 12
 
-    local function text(str, font, gap)
-        used = used + 1
-        local fs = GetFS(used)
-        fs:SetFontObject(font or GameFontHighlight)
-        fs:ClearAllPoints()
-        fs:SetPoint("TOPLEFT", ui.detailChild, "TOPLEFT", 0, -y)
-        fs:SetWidth(dw - 8)
-        fs:SetText(str)
-        fs:Show()
-        y = y + fs:GetStringHeight() + (gap or 6)
+    local WORD_GAP, LINE_H, BULLET_INDENT = 4, 15, 14
+    local function measureWidth(str)
+        ui.measureFS:SetText(str)
+        return ui.measureFS:GetStringWidth() or 0
     end
+
+    local function flowLine(line, startX, startY)
+        local maxW = cardW - 20
+        local x = startX + BULLET_INDENT
+        local curY = startY
+
+        usedWord = usedWord + 1
+        local dashFS = GetWordFS(usedWord)
+        dashFS:SetFontObject(GameFontHighlight)
+        dashFS:ClearAllPoints()
+        dashFS:SetPoint("TOPLEFT", ui.detailChild, "TOPLEFT", startX + 4, -curY)
+        dashFS:SetText("•")
+        dashFS:Show()
+
+        local tokens = WM:TokenizeLine(line, boss)
+        for _, tok in ipairs(tokens) do
+            local w = tok.raidTarget and 16 or measureWidth(tok.text)
+            if x > (startX + BULLET_INDENT) and (x + w) > (startX + maxW) then
+                x = startX + BULLET_INDENT
+                curY = curY + LINE_H
+            end
+
+            if tok.raidTarget then
+                usedIcon = usedIcon + 1
+                local ico = GetRaidIcon(usedIcon)
+                local coords = RAID_TARGET_COORDS[tok.raidTarget]
+                ico:SetTexCoord(coords[1], coords[2], coords[3], coords[4])
+                ico:ClearAllPoints()
+                ico:SetPoint("TOPLEFT", ui.detailChild, "TOPLEFT", x, -curY)
+                ico:Show()
+            elseif tok.ability then
+                usedWordBtn = usedWordBtn + 1
+                local row = GetWordBtn(usedWordBtn)
+                row.btn.ab = tok.ability
+                row.btn:ClearAllPoints()
+                row.btn:SetPoint("TOPLEFT", ui.detailChild, "TOPLEFT", x, -curY + 1)
+                row.btn:SetWidth(w + 2)
+                local kind = tok.ability.kind
+                local color = (kind == "buff" and C.buff) or (kind == "debuff" and C.debuff) or "|cff71d5ff"
+                row.btn.text:SetText(color .. tok.text .. "|r")
+                row.btn:Show()
+            else
+                usedWord = usedWord + 1
+                local fs = GetWordFS(usedWord)
+                fs:SetFontObject(GameFontHighlight)
+                fs:ClearAllPoints()
+                fs:SetPoint("TOPLEFT", ui.detailChild, "TOPLEFT", x, -curY)
+                fs:SetText(tok.text)
+                fs:Show()
+            end
+            x = x + w + WORD_GAP
+        end
+        return curY + LINE_H + 4
+    end
+
+    local function renderCard(title, titleColor, lines, anchorKey, rawLines)
+        if not lines or #lines == 0 then return end
+        if anchorKey then ui.sectionOffsets[anchorKey] = y end
+
+        usedCard = usedCard + 1
+        local card = GetCard(usedCard)
+        card:ClearAllPoints()
+        card:SetPoint("TOPLEFT", ui.detailChild, "TOPLEFT", 6, -y)
+        card:SetWidth(cardW)
+
+        card.title:SetText(titleColor .. title .. "|r")
+        card.sendBtn:SetScript("OnClick", function()
+            WM:SendSection(boss, title, rawLines or lines)
+        end)
+        card:Show()
+
+        local startCardY = y
+        local innerY = y + 26
+        for _, l in ipairs(lines) do
+            innerY = flowLine(l, 6, innerY)
+        end
+
+        local cardHeight = (innerY - startCardY) + 6
+        card:SetHeight(cardHeight)
+        y = y + cardHeight + 8
+    end
+
+    if boss then
+        local raid = self.raids[boss.raidId]
+        local role = self.db.role
+        local roleName = ({ ALL = self.L["All roles"], TANK = self.L["Tank"], HEAL = self.L["Healer"], DPS = self.L["DPS"] })[role] or role
+        local bossName = boss.displayName or boss.name
+        local raidName = raid and raid.name or "?"
+        local sizeText = string.format(self.L["%d-man"], self:GetSize())
+
+        usedFS = usedFS + 1
+        local hdr = GetFS(usedFS)
+        hdr:SetFontObject(GameFontNormalLarge)
+        hdr:ClearAllPoints()
+        hdr:SetPoint("TOPLEFT", ui.detailChild, "TOPLEFT", 6, -y)
+        hdr:SetWidth(cardW)
+        hdr:SetText(C.title .. bossName .. "|r  " .. C.grey .. "(" .. raidName .. " - " .. sizeText .. " - " .. roleName .. ")|r")
+        hdr:Show()
+        y = y + hdr:GetStringHeight() + 8
+
+        if boss.tldr then
+            local tldrLines = { self:Expand(boss.tldr, "raw") or boss.tldr }
+            renderCard(self.L["TL;DR"] or "TL;DR", C.tldr, tldrLines, nil, { boss.tldr })
+        end
+
+        if boss.start and #boss.start > 0 then
+            renderCard(self.L["How to start the fight"], C.start, self:ExpandList(boss.start, "raw"), "start", boss.start)
+        end
+
+        if boss.general and #boss.general > 0 then
+            local hasSubPhases = false
+            for _, l in ipairs(boss.general) do
+                if string.sub(l, 1, 3) == "## " then hasSubPhases = true; break end
+            end
+
+            if hasSubPhases then
+                local currentTitle = self.L["Strategy"]
+                local currentLines = {}
+                local firstAnchor = true
+                for _, l in ipairs(boss.general) do
+                    if string.sub(l, 1, 3) == "## " then
+                        if #currentLines > 0 then
+                            renderCard(currentTitle, C.strat, self:ExpandList(currentLines, "raw"), firstAnchor and "strat" or nil, currentLines)
+                            firstAnchor = false
+                            currentLines = {}
+                        end
+                        currentTitle = string.sub(l, 4)
+                    else
+                        currentLines[#currentLines + 1] = l
+                    end
+                end
+                if #currentLines > 0 then
+                    renderCard(currentTitle, C.strat, self:ExpandList(currentLines, "raw"), firstAnchor and "strat" or nil, currentLines)
+                end
+            else
+                renderCard(self.L["Strategy"], C.strat, self:ExpandList(boss.general, "raw"), "strat", boss.general)
+            end
+        end
+
+        local firstRoleAnchor = true
+        if (role == "ALL" or role == "TANK") and boss.tank and #boss.tank > 0 then
+            renderCard(self.L["Tanks"], C.tank, self:ExpandList(boss.tank, "raw"), firstRoleAnchor and "roles" or nil, boss.tank)
+            firstRoleAnchor = false
+        end
+        if (role == "ALL" or role == "HEAL") and boss.heal and #boss.heal > 0 then
+            renderCard(self.L["Healers"], C.heal, self:ExpandList(boss.heal, "raw"), firstRoleAnchor and "roles" or nil, boss.heal)
+            firstRoleAnchor = false
+        end
+        if (role == "ALL" or role == "DPS") and boss.dps and #boss.dps > 0 then
+            renderCard("DPS", C.dps, self:ExpandList(boss.dps, "raw"), firstRoleAnchor and "roles" or nil, boss.dps)
+            firstRoleAnchor = false
+        end
+
+        if boss.hard and #boss.hard > 0 then
+            renderCard(self.L["Hard mode / Heroic - full explanation"], C.hard, self:ExpandList(boss.hard, "raw"), "hard", boss.hard)
+        end
+    end
+
+    for _, a in ipairs(ANCHORS) do
+        local btn = ui.anchorButtons[a.key]
+        if btn then
+            if ui.sectionOffsets[a.key] then btn:Enable() else btn:Disable() end
+            UpdateButtonVisual(btn)
+        end
+    end
+
+    for i = usedCard + 1, #ui.cardPool do ui.cardPool[i]:Hide() end
+    for i = usedFS + 1, #ui.fsPool do ui.fsPool[i]:Hide() end
+    for i = usedWord + 1, #ui.wordPool do ui.wordPool[i]:Hide() end
+    for i = usedWordBtn + 1, #ui.wordBtnPool do ui.wordBtnPool[i].btn:Hide() end
+    for i = usedIcon + 1, #ui.iconPool do ui.iconPool[i]:Hide() end
+
+    ui.detailChild:SetHeight(y + 24)
+    WM:ApplyTheme()
+end
+
+------------------------------------------------------------------
+-- Content Renderers: Dedicated Abilities Tab
+------------------------------------------------------------------
+function WM:RefreshAbilitiesTab()
+    if not ui.main or ui.activeTab ~= "abilities" then return end
+    local boss = self.selected
+    local usedAb, usedBuff = 0, 0
+    local y = 6
+    local dw = (ui.abilitiesScroll and ui.abilitiesScroll:GetWidth()) or DETAIL_W
+    if not dw or dw <= 0 then dw = DETAIL_W end
 
     local function abilityRow(getRow, i, ab, nameColor)
         local row = getRow(i)
         row.btn.ab = ab
         row.btn:ClearAllPoints()
-        row.btn:SetPoint("TOPLEFT", ui.detailChild, "TOPLEFT", 4, -y)
+        row.btn:SetPoint("TOPLEFT", ui.abilitiesChild, "TOPLEFT", 4, -y)
         row.btn:SetWidth(dw - 8)
         row.icon:SetTexture(WM:GetSpellIcon(ab))
         local abDisplayName = ab.resolvedName or self.L[ab.name] or ab.name
@@ -539,121 +936,19 @@ function WM:RefreshDetail()
             row.btn.text:SetText(C.white .. abDisplayName .. "|r" .. kindTag)
         end
         row.btn:Show()
-        y = y + 18
+        y = y + 20
+
         row.desc:ClearAllPoints()
-        row.desc:SetPoint("TOPLEFT", ui.detailChild, "TOPLEFT", 20, -y)
-        row.desc:SetWidth(dw - 28)
+        row.desc:SetPoint("TOPLEFT", ui.abilitiesChild, "TOPLEFT", 28, -y)
+        row.desc:SetWidth(dw - 36)
         row.desc:SetText(self:Expand(ab.desc) or "")
         row.desc:Show()
-        y = y + row.desc:GetStringHeight() + 7
+        y = y + row.desc:GetStringHeight() + 10
     end
 
-    local WORD_GAP, LINE_H, BULLET_INDENT = 4, 15, 14
-    local function measureWidth(str)
-        ui.measureFS:SetText(str)
-        return ui.measureFS:GetStringWidth() or 0
-    end
-
-    local function flowLine(line)
-        if string.sub(line, 1, 3) == "## " then
-            text(C.sub .. string.sub(line, 4) .. "|r", GameFontNormal, 2)
-            return
-        end
-        local maxW = dw - 12
-        local x = BULLET_INDENT
-
-        usedWord = usedWord + 1
-        local dashFS = GetWordFS(usedWord)
-        dashFS:SetFontObject(GameFontHighlight)
-        dashFS:ClearAllPoints()
-        dashFS:SetPoint("TOPLEFT", ui.detailChild, "TOPLEFT", 2, -y)
-        dashFS:SetText("•")
-        dashFS:Show()
-
-        local tokens = WM:TokenizeLine(line, boss)
-        for _, tok in ipairs(tokens) do
-            local w = measureWidth(tok.text)
-            if x > BULLET_INDENT and x + w > maxW then
-                x = BULLET_INDENT
-                y = y + LINE_H
-            end
-            if tok.ability then
-                usedWordBtn = usedWordBtn + 1
-                local row = GetWordBtn(usedWordBtn)
-                row.btn.ab = tok.ability
-                row.btn:ClearAllPoints()
-                row.btn:SetPoint("TOPLEFT", ui.detailChild, "TOPLEFT", x, -y + 1)
-                row.btn:SetWidth(w + 2)
-                local kind = tok.ability.kind
-                local color = (kind == "buff" and C.buff) or (kind == "debuff" and C.debuff) or "|cff71d5ff"
-                row.btn.text:SetText(color .. tok.text .. "|r")
-                row.btn:Show()
-            else
-                usedWord = usedWord + 1
-                local fs = GetWordFS(usedWord)
-                fs:SetFontObject(GameFontHighlight)
-                fs:ClearAllPoints()
-                fs:SetPoint("TOPLEFT", ui.detailChild, "TOPLEFT", x, -y)
-                fs:SetText(tok.text)
-                fs:Show()
-            end
-            x = x + w + WORD_GAP
-        end
-        y = y + LINE_H + 4
-    end
-
-    local function section(title, color, lines, anchorKey)
-        if not lines or #lines == 0 then return end
-        if anchorKey then ui.sectionOffsets[anchorKey] = y end
-        text(color .. title .. "|r", GameFontNormal, 2)
-        for _, l in ipairs(lines) do flowLine(l) end
-        y = y + 6
-    end
-
-    if boss then
-        local raid = self.raids[boss.raidId]
-        local role = self.db.role
-        local roleName = ({
-            ALL = self.L["All roles"],
-            TANK = self.L["Tank"],
-            HEAL = self.L["Healer"],
-            DPS = self.L["DPS"]
-        })[role] or role
-        local bossName = boss.displayName or boss.name
-        local raidName = raid and raid.name or "?"
-        local sizeText = string.format(self.L["%d-man"], self:GetSize())
-
-        text(C.title .. bossName .. "|r  " .. C.grey .. "(" .. raidName .. " - " .. sizeText .. " - " .. roleName .. ")|r", GameFontNormalLarge, 8)
-
-        if boss.tldr then
-            text(C.tldr .. self.L["TL;DR"] .. "|r  " .. (self:Expand(boss.tldr) or boss.tldr), GameFontHighlight, 10)
-        end
-
-        section(self.L["How to start the fight"], C.start, self:ExpandList(boss.start, "raw"), "start")
-        section(self.L["Strategy"], C.strat, self:ExpandList(boss.general, "raw"), "strat")
-
-        local hasRoleSection = false
-        if role == "ALL" or role == "TANK" then
-            if boss.tank and #boss.tank > 0 then
-                if not hasRoleSection then ui.sectionOffsets["roles"] = y; hasRoleSection = true end
-                section(self.L["Tanks"], C.tank, self:ExpandList(boss.tank, "raw"))
-            end
-        end
-        if role == "ALL" or role == "HEAL" then
-            if boss.heal and #boss.heal > 0 then
-                if not hasRoleSection then ui.sectionOffsets["roles"] = y; hasRoleSection = true end
-                section(self.L["Healers"], C.heal, self:ExpandList(boss.heal, "raw"))
-            end
-        end
-        if role == "ALL" or role == "DPS" then
-            if boss.dps and #boss.dps > 0 then
-                if not hasRoleSection then ui.sectionOffsets["roles"] = y; hasRoleSection = true end
-                section("DPS", C.dps, self:ExpandList(boss.dps, "raw"))
-            end
-        end
-
+    if boss and boss.abilities and #boss.abilities > 0 then
         local plainAbs, statusAbs = {}, {}
-        for _, ab in ipairs(boss.abilities or {}) do
+        for _, ab in ipairs(boss.abilities) do
             if ab.kind == "buff" or ab.kind == "debuff" then
                 statusAbs[#statusAbs + 1] = ab
             else
@@ -661,51 +956,77 @@ function WM:RefreshDetail()
             end
         end
 
-        if #plainAbs > 0 or #statusAbs > 0 then
-            ui.sectionOffsets["abil"] = y
-        end
-
         if #plainAbs > 0 then
-            text(C.abil .. self.L["Boss abilities"] .. "|r  " .. C.grey .. self.L["(hover for the game tooltip, click to open it, shift-click to link in chat)"] .. "|r", GameFontNormal, 4)
+            ui.abHeader:SetText(C.abil .. self.L["Boss abilities"] .. "|r  " .. C.grey .. self.L["(hover for the game tooltip, click to open it, shift-click to link in chat)"] .. "|r")
+            ui.abHeader:SetPoint("TOPLEFT", ui.abilitiesChild, "TOPLEFT", 4, -y)
+            ui.abHeader:Show()
+            y = y + ui.abHeader:GetStringHeight() + 8
             for _, ab in ipairs(plainAbs) do
                 usedAb = usedAb + 1
                 abilityRow(GetAbRow, usedAb, ab)
             end
-            y = y + 4
+            y = y + 6
+        else
+            ui.abHeader:Hide()
         end
 
         if #statusAbs > 0 then
-            text(C.buffdebuff .. (self.L["BUFFS & DEBUFFS"] or "Buffs & Debuffs") .. "|r", GameFontNormal, 4)
+            ui.buffHeader:SetText(C.buffdebuff .. (self.L["BUFFS & DEBUFFS"] or "Buffs & Debuffs") .. "|r")
+            ui.buffHeader:SetPoint("TOPLEFT", ui.abilitiesChild, "TOPLEFT", 4, -y)
+            ui.buffHeader:Show()
+            y = y + ui.buffHeader:GetStringHeight() + 8
             for _, ab in ipairs(statusAbs) do
                 usedBuff = usedBuff + 1
                 local nameColor = (ab.kind == "buff") and C.buff or C.debuff
                 abilityRow(GetBuffRow, usedBuff, ab, nameColor)
             end
-            y = y + 4
+            y = y + 6
+        else
+            ui.buffHeader:Hide()
         end
-
-        section(self.L["Hard mode / Heroic - full explanation"], C.hard, self:ExpandList(boss.hard, "raw"), "hard")
     else
-        text("", GameFontHighlight, 0)
+        ui.abHeader:SetText(C.grey .. self.L["No boss selected."] .. "|r")
+        ui.abHeader:SetPoint("TOPLEFT", ui.abilitiesChild, "TOPLEFT", 4, -y)
+        ui.abHeader:Show()
+        ui.buffHeader:Hide()
     end
 
-    for _, a in ipairs(ANCHORS) do
-        local btn = ui.anchorButtons[a.key]
-        if btn then
-            if ui.sectionOffsets[a.key] then btn:Enable() else btn:Disable() end
-            UpdateButtonVisual(btn)
-        end
-    end
-
-    for i = used + 1, #ui.fsPool do ui.fsPool[i]:Hide() end
     for i = usedAb + 1, #ui.abPool do ui.abPool[i].btn:Hide(); ui.abPool[i].desc:Hide() end
     for i = usedBuff + 1, #ui.buffPool do ui.buffPool[i].btn:Hide(); ui.buffPool[i].desc:Hide() end
-    for i = usedWord + 1, #ui.wordPool do ui.wordPool[i]:Hide() end
-    for i = usedWordBtn + 1, #ui.wordBtnPool do ui.wordBtnPool[i].btn:Hide() end
+    ui.abilitiesChild:SetHeight(y + 24)
+end
 
-    ui.detailChild:SetHeight(y + 24)
-    ui.detailScroll:SetVerticalScroll(0)
-    if ui.copyMode then self:RefreshCopy() end
+------------------------------------------------------------------
+-- Content Renderers: Embedded Notes Tab
+------------------------------------------------------------------
+function WM:LoadNotes()
+    if not ui.notesEdit then return end
+    local boss = self.selected
+    self.notesBoss = boss
+    local bName = boss and (boss.displayName or boss.name) or ""
+    ui.notesTitle:SetText(string.format(self.L["Personal notes for %s"] or "Personal notes for %s", bName))
+    ui.notesEdit:SetText((boss and self.db.notes[self:BossKey(boss)]) or "")
+    ui.notesEdit:SetCursorPosition(0)
+    ui.notesDirty = false
+    ui.notesStatus:SetText("")
+end
+
+function WM:SaveNotes(silent)
+    if not ui.notesEdit or not self.notesBoss then return end
+    local text = ui.notesEdit:GetText() or ""
+    local key = self:BossKey(self.notesBoss)
+    if string.match(text, "^%s*$") then
+        self.db.notes[key] = nil
+    else
+        self.db.notes[key] = text
+    end
+    ui.notesDirty = false
+    ui.notesStatus:SetText(self.L["Saved"])
+    if ui.main then self:RefreshList() end
+    if not silent then
+        local bName = self.notesBoss.displayName or self.notesBoss.name
+        self:Print(string.format(self.L["Notes saved for %s."], bName))
+    end
 end
 
 ------------------------------------------------------------------
@@ -736,7 +1057,10 @@ function WM:SetCopyMode(on)
     if not ui.copyFrame then return end
     ui.copyMode = on and true or false
     if ui.copyMode then
-        ui.detailScroll:Hide()
+        if ui.detailScroll then ui.detailScroll:Hide() end
+        if ui.abilitiesScroll then ui.abilitiesScroll:Hide() end
+        if ui.notesFrame then ui.notesFrame:Hide() end
+        if ui.anchorContainer then ui.anchorContainer:Hide() end
         ui.copyFrame:Show()
         self:RefreshCopy()
         ui.copyEdit:SetFocus()
@@ -745,8 +1069,8 @@ function WM:SetCopyMode(on)
     else
         ui.copyEdit:ClearFocus()
         ui.copyFrame:Hide()
-        ui.detailScroll:Show()
         ui.copyButton:SetText(self.L["Copy"])
+        self:SetTab(ui.activeTab or "tactics")
     end
 end
 
@@ -761,147 +1085,32 @@ function WM:SelectBoss(boss)
     if self.collapsed[boss.raidId] then self.collapsed[boss.raidId] = false end
     if ui.main then
         self:RefreshList()
-        self:RefreshDetail()
-        self:LoadNotes()
+        if ui.activeTab == "tactics" then
+            self:RefreshDetail()
+            if ui.detailScroll then ui.detailScroll:SetVerticalScroll(0) end
+        elseif ui.activeTab == "abilities" then
+            self:RefreshAbilitiesTab()
+            if ui.abilitiesScroll then ui.abilitiesScroll:SetVerticalScroll(0) end
+        elseif ui.activeTab == "notes" then
+            self:LoadNotes()
+        end
+        if ui.copyMode then self:RefreshCopy() end
     end
 end
 
 function WM:SetRole(role)
     self.db.role = role
-    if ui.main then self:RefreshDetail() end
+    if ui.main and ui.activeTab == "tactics" then self:RefreshDetail() end
     if ui.quick and ui.quick:IsShown() and ui.quick.boss then self:ShowQuick(ui.quick.boss) end
 end
 
 function WM:SetSize(size)
     self.db.size = size
-    if ui.main then self:RefreshDetail() end
+    if ui.main then
+        if ui.activeTab == "tactics" then self:RefreshDetail() end
+        if ui.activeTab == "abilities" then self:RefreshAbilitiesTab() end
+    end
     if ui.quick and ui.quick:IsShown() and ui.quick.boss then self:ShowQuick(ui.quick.boss) end
-end
-
-------------------------------------------------------------------
--- Personal Notes
-------------------------------------------------------------------
-function WM:RefreshNotesButton()
-    if not ui.notesButton then return end
-    local has = self.selected and self.db.notes[self:BossKey(self.selected)]
-    ui.notesButton:SetText(has and (self.L["Notes"] .. "*") or self.L["Notes"])
-    if ui.main then self:RefreshList() end
-end
-
-local function SetNotesStatus(text)
-    if ui.notesStatus then ui.notesStatus:SetText(text or "") end
-end
-
-function WM:LoadNotes()
-    self:RefreshNotesButton()
-    if not ui.notes then return end
-    local boss = self.selected
-    self.notesBoss = boss
-    local bName = boss and (boss.displayName or boss.name) or ""
-    ui.notesTitle:SetText(self.L["Notes - "] .. bName)
-    ui.notesEdit:SetText((boss and self.db.notes[self:BossKey(boss)]) or "")
-    ui.notesEdit:SetCursorPosition(0)
-    ui.notesDirty = false
-    SetNotesStatus("")
-end
-
-function WM:SaveNotes(silent)
-    if not ui.notes or not self.notesBoss then return end
-    local text = ui.notesEdit:GetText() or ""
-    local key = self:BossKey(self.notesBoss)
-    if string.match(text, "^%s*$") then
-        self.db.notes[key] = nil
-    else
-        self.db.notes[key] = text
-    end
-    ui.notesDirty = false
-    SetNotesStatus(self.L["Saved"])
-    self:RefreshNotesButton()
-    if not silent then
-        local bName = self.notesBoss.displayName or self.notesBoss.name
-        self:Print(string.format(self.L["Notes saved for %s."], bName))
-    end
-end
-
-local function CreateNotes()
-    local n = CreateFrame("Frame", "WrathMentorNotes", ui.main)
-    ui.notes = n
-    n:SetWidth(270)
-    n:SetHeight(360)
-    n:SetPoint("TOPLEFT", ui.main, "TOPRIGHT", 2, 0)
-    n:SetClampedToScreen(true)
-    n:Hide()
-
-    ui.notesTitle = n:CreateFontString(nil, "ARTWORK", "GameFontNormal")
-    ui.notesTitle:SetPoint("TOPLEFT", n, "TOPLEFT", 16, -16)
-    ui.notesTitle:SetWidth(230)
-    ui.notesTitle:SetJustifyH("LEFT")
-
-    local scroll = CreateFrame("ScrollFrame", "WrathMentorNotesScroll", n, "UIPanelScrollFrameTemplate")
-    scroll:SetPoint("TOPLEFT", n, "TOPLEFT", 16, -42)
-    scroll:SetWidth(222)
-    scroll:SetHeight(246)
-    EnableWheel(scroll)
-    RegisterScrollBar(scroll, false)
-
-    local edit = CreateFrame("EditBox", "WrathMentorNotesEdit", scroll)
-    ui.notesEdit = edit
-    edit:SetMultiLine(true)
-    edit:SetAutoFocus(false)
-    edit:SetFontObject(ChatFontNormal)
-    edit:SetWidth(214)
-    edit:SetHeight(246)
-    edit:SetMaxLetters(4000)
-    scroll:SetScrollChild(edit)
-    edit:SetScript("OnEscapePressed", function(self) self:ClearFocus() end)
-    edit:SetScript("OnTextChanged", function(self, userInput)
-        if userInput then
-            ui.notesDirty = true
-            SetNotesStatus(WM.L["Unsaved changes"])
-        end
-        local text = self:GetText() or ""
-        local lines = 0
-        for line in string.gmatch(text .. "\n", "(.-)\n") do
-            lines = lines + math.max(1, math.ceil(string.len(line) / 30))
-        end
-        self:SetHeight(math.max(246, lines * 14 + 20))
-    end)
-
-    ui.notesStatus = n:CreateFontString(nil, "ARTWORK", "GameFontHighlightSmall")
-    ui.notesStatus:SetPoint("BOTTOMLEFT", n, "BOTTOMLEFT", 16, 48)
-
-    local save = CreateFrame("Button", "WrathMentorNotesSave", n, "UIPanelButtonTemplate")
-    save:SetWidth(86)
-    save:SetHeight(22)
-    save:SetPoint("BOTTOMLEFT", n, "BOTTOMLEFT", 16, 16)
-    save:SetText(WM.L["Save"])
-    save:SetScript("OnClick", function()
-        edit:ClearFocus()
-        WM:SaveNotes(false)
-    end)
-    RegisterButton(save)
-
-    local close = CreateFrame("Button", "WrathMentorNotesClose", n, "UIPanelButtonTemplate")
-    close:SetWidth(86)
-    close:SetHeight(22)
-    close:SetPoint("LEFT", save, "RIGHT", 6, 0)
-    close:SetText(WM.L["Close"])
-    close:SetScript("OnClick", function() WM:ToggleNotes() end)
-    RegisterButton(close)
-
-    WM:ApplyTheme()
-end
-
-function WM:ToggleNotes()
-    if not ui.main then return end
-    if not ui.notes then CreateNotes() end
-    if ui.notes:IsShown() then
-        if ui.notesDirty then self:SaveNotes(true) end
-        ui.notes:Hide()
-    else
-        ui.notes:Show()
-        self:LoadNotes()
-    end
 end
 
 ------------------------------------------------------------------
@@ -975,13 +1184,14 @@ end
 local function CreateMain()
     local f = CreateFrame("Frame", "WrathMentorFrame", UIParent)
     ui.main = f
-    f:SetWidth(WM.db.mainWidth or 760)
-    f:SetHeight(WM.db.mainHeight or 500)
+    f:SetWidth(WM.db.mainWidth or 780)
+    f:SetHeight(WM.db.mainHeight or 520)
     f:SetFrameStrata("DIALOG")
     f:SetToplevel(true)
     f:SetMovable(true)
     f:EnableMouse(true)
     f:SetClampedToScreen(true)
+    f:SetBackdrop(BACKDROP_CLASSIC)
     f:RegisterForDrag("LeftButton")
     f:SetScript("OnDragStart", function(self) self:StartMoving() end)
     f:SetScript("OnDragStop", function(self)
@@ -994,7 +1204,7 @@ local function CreateMain()
     end)
     RestorePos(f, "mainPos", "CENTER", "CENTER", 0, 0)
     if f.SetResizable then f:SetResizable(true) end
-    if f.SetMinResize then f:SetMinResize(660, 420) end
+    if f.SetMinResize then f:SetMinResize(680, 440) end
     if f.SetMaxResize then f:SetMaxResize(1400, 900) end
     f:Hide()
     tinsert(UISpecialFrames, "WrathMentorFrame")
@@ -1006,9 +1216,53 @@ local function CreateMain()
     local close = CreateFrame("Button", nil, f, "UIPanelCloseButton")
     close:SetPoint("TOPRIGHT", f, "TOPRIGHT", -4, -4)
 
-    -- Left: Boss List
+    --------------------------------------------------------------
+    -- Left Sidebar: Live Search & Boss List
+    --------------------------------------------------------------
+    local sb = CreateFrame("EditBox", "WrathMentorSearchBox", f)
+    sb:SetPoint("TOPLEFT", f, "TOPLEFT", 14, -42)
+    sb:SetWidth(LIST_W)
+    sb:SetHeight(22)
+    sb:SetAutoFocus(false)
+    sb:SetFontObject(GameFontHighlightSmall)
+    sb:SetTextInsets(6, 20, 0, 0)
+
+    local ph = sb:CreateFontString(nil, "ARTWORK", "GameFontHighlightSmall")
+    ph:SetPoint("LEFT", sb, "LEFT", 6, 0)
+    ph:SetText(WM.L["Search boss..."] or "Search boss...")
+    ph:SetTextColor(0.5, 0.5, 0.5, 0.9)
+    sb.placeholder = ph
+
+    local clearBtn = CreateFrame("Button", nil, sb)
+    clearBtn:SetWidth(16)
+    clearBtn:SetHeight(16)
+    clearBtn:SetPoint("RIGHT", sb, "RIGHT", -4, 0)
+    clearBtn:SetNormalTexture("Interface\\FriendsFrame\\ClearBroadcastIcon")
+    clearBtn:SetAlpha(0.6)
+    clearBtn:Hide()
+    clearBtn:SetScript("OnClick", function()
+        sb:SetText("")
+        sb:ClearFocus()
+    end)
+    sb.clearBtn = clearBtn
+
+    sb:SetScript("OnTextChanged", function(self, userInput)
+        local val = self:GetText() or ""
+        if val == "" then
+            ph:Show()
+            clearBtn:Hide()
+        else
+            ph:Hide()
+            clearBtn:Show()
+        end
+        WM.searchQuery = val
+        WM:RefreshList()
+    end)
+    sb:SetScript("OnEscapePressed", function(self) self:ClearFocus() end)
+    ui.searchBox = sb
+
     local listScroll = CreateFrame("ScrollFrame", "WrathMentorListScroll", f, "UIPanelScrollFrameTemplate")
-    listScroll:SetPoint("TOPLEFT", f, "TOPLEFT", 14, -44)
+    listScroll:SetPoint("TOPLEFT", sb, "BOTTOMLEFT", 0, -4)
     listScroll:SetPoint("BOTTOMLEFT", f, "BOTTOMLEFT", 14, 48)
     listScroll:SetWidth(LIST_W)
     local listChild = CreateFrame("Frame", nil, listScroll)
@@ -1020,68 +1274,69 @@ local function CreateMain()
     ui.listScroll = listScroll
     ui.listChild = listChild
 
-    -- Vertical Separator
     local sep = f:CreateTexture(nil, "BORDER")
-    sep:SetPoint("TOPLEFT", f, "TOPLEFT", 226, -40)
-    sep:SetPoint("BOTTOMLEFT", f, "BOTTOMLEFT", 226, 44)
+    sep:SetPoint("TOPLEFT", f, "TOPLEFT", 228, -40)
+    sep:SetPoint("BOTTOMLEFT", f, "BOTTOMLEFT", 228, 44)
     sep:SetWidth(1)
     sep:SetTexture(SOLID)
     sep:SetVertexColor(0.25, 0.28, 0.38, 0.8)
     f.separator = sep
 
-    -- Row 1: Roles
-    local prev
+    --------------------------------------------------------------
+    -- Right Top Row 1: Segmented Roles & Sizes (Pill Bars)
+    --------------------------------------------------------------
+    local roleSeg = CreateFrame("Frame", "WrathMentorRoleSegment", f)
+    roleSeg:SetPoint("TOPLEFT", f, "TOPLEFT", 238, -42)
+    roleSeg:SetHeight(22)
+    roleSeg:SetWidth(198)
+    ui.roleSegment = roleSeg
+
+    local prevRoleBtn
     for i, r in ipairs(ROLES) do
-        local b = CreateFrame("Button", "WrathMentorRole" .. r[1], f, "UIPanelButtonTemplate")
-        b:SetWidth(r[3])
-        b:SetHeight(22)
-        b:SetText(WM.L[r[2]])
-        if i == 1 then
-            b:SetPoint("TOPLEFT", f, "TOPLEFT", 236, -44)
-        else
-            b:SetPoint("LEFT", prev, "RIGHT", 2, 0)
-        end
         local roleKey = r[1]
-        b:SetScript("OnClick", function() WM:SetRole(roleKey) end)
-        RegisterButton(b)
+        local b = CreateSegmentBtn("WrathMentorRole" .. roleKey, roleSeg, r[3], 20, WM.L[r[2]], function()
+            WM:SetRole(roleKey)
+        end)
+        if i == 1 then
+            b:SetPoint("TOPLEFT", roleSeg, "TOPLEFT", 1, -1)
+        else
+            b:SetPoint("LEFT", prevRoleBtn, "RIGHT", 0, 0)
+        end
         ui.roleButtons[roleKey] = b
-        prev = b
+        prevRoleBtn = b
     end
 
-    local sepGroup = f:CreateTexture(nil, "BORDER")
-    sepGroup:SetPoint("LEFT", prev, "RIGHT", 8, 0)
-    sepGroup:SetWidth(1)
-    sepGroup:SetHeight(18)
-    sepGroup:SetTexture(SOLID)
-    sepGroup:SetVertexColor(0.30, 0.33, 0.45, 0.75)
-    f.sepGroup = sepGroup
+    local sizeSeg = CreateFrame("Frame", "WrathMentorSizeSegment", f)
+    sizeSeg:SetPoint("LEFT", roleSeg, "RIGHT", 8, 0)
+    sizeSeg:SetHeight(22)
+    sizeSeg:SetWidth(68)
+    ui.sizeSegment = sizeSeg
 
-    -- Row 1: Sizes
-    local prevSize = sepGroup
+    local prevSizeBtn
     for i, size in ipairs({ 10, 25 }) do
-        local b = CreateFrame("Button", "WrathMentorSize" .. size, f, "UIPanelButtonTemplate")
-        b:SetWidth(32)
-        b:SetHeight(22)
-        b:SetText(tostring(size))
-        b:SetPoint("LEFT", prevSize, "RIGHT", (i == 1) and 8 or 2, 0)
         local s = size
-        b:SetScript("OnClick", function() WM:SetSize(s) end)
+        local b = CreateSegmentBtn("WrathMentorSize" .. s, sizeSeg, 33, 20, tostring(s), function()
+            WM:SetSize(s)
+        end)
         b:SetScript("OnEnter", function(self)
             GameTooltip:SetOwner(self, "ANCHOR_TOP")
             GameTooltip:AddLine(string.format(WM.L["%s-man version of the tactics"], s))
             GameTooltip:Show()
         end)
         b:SetScript("OnLeave", function() GameTooltip:Hide() end)
-        RegisterButton(b)
+        if i == 1 then
+            b:SetPoint("TOPLEFT", sizeSeg, "TOPLEFT", 1, -1)
+        else
+            b:SetPoint("LEFT", prevSizeBtn, "RIGHT", 0, 0)
+        end
         ui.sizeButtons[size] = b
-        prevSize = b
+        prevSizeBtn = b
     end
 
-    -- Row 1: Copy & Notes (Anchored Right)
     local cb = CreateFrame("Button", "WrathMentorCopyButton", f, "UIPanelButtonTemplate")
     cb:SetWidth(56)
     cb:SetHeight(22)
-    cb:SetPoint("TOPRIGHT", f, "TOPRIGHT", -22, -44)
+    cb:SetPoint("TOPRIGHT", f, "TOPRIGHT", -22, -42)
     cb:SetText(WM.L["Copy"])
     cb:SetScript("OnClick", function() WM:ToggleCopy() end)
     cb:SetScript("OnEnter", function(self)
@@ -1094,37 +1349,44 @@ local function CreateMain()
     RegisterButton(cb)
     ui.copyButton = cb
 
-    local nb = CreateFrame("Button", "WrathMentorNotesButton", f, "UIPanelButtonTemplate")
-    nb:SetWidth(66)
-    nb:SetHeight(22)
-    nb:SetPoint("RIGHT", cb, "LEFT", -4, 0)
-    nb:SetText(WM.L["Notes"])
-    nb:SetScript("OnClick", function() WM:ToggleNotes() end)
-    nb:SetScript("OnEnter", function(self)
-        GameTooltip:SetOwner(self, "ANCHOR_TOP")
-        GameTooltip:AddLine(WM.L["Personal notes for this boss"])
-        GameTooltip:AddLine(WM.L["Opens a side box. Press Save to keep them."], 1, 1, 1)
-        GameTooltip:Show()
-    end)
-    nb:SetScript("OnLeave", function() GameTooltip:Hide() end)
-    RegisterButton(nb)
-    ui.notesButton = nb
+    --------------------------------------------------------------
+    -- Right Row 2: Segmented Tabs & Section Anchors
+    --------------------------------------------------------------
+    local tabSeg = CreateFrame("Frame", "WrathMentorTabSegment", f)
+    tabSeg:SetPoint("TOPLEFT", f, "TOPLEFT", 238, -68)
+    tabSeg:SetHeight(22)
+    tabSeg:SetWidth(250)
+    ui.tabSegment = tabSeg
 
-    -- Row 2: Anchor Navigation
-    local navLabel = f:CreateFontString(nil, "ARTWORK", "GameFontNormalSmall")
-    navLabel:SetPoint("TOPLEFT", f, "TOPLEFT", 236, -72)
-    navLabel:SetText(WM.L["Sections:"] or "Sections:")
-    navLabel:SetTextColor(0.55, 0.70, 0.90)
-    ui.navLabel = navLabel
+    local prevTabBtn
+    for i, t in ipairs(TABS) do
+        local k = t.key
+        local b = CreateSegmentBtn("WrathMentorTab" .. k, tabSeg, t.w, 20, WM.L[t.label] or t.label, function()
+            WM:SetTab(k)
+        end)
+        if i == 1 then
+            b:SetPoint("TOPLEFT", tabSeg, "TOPLEFT", 1, -1)
+        else
+            b:SetPoint("LEFT", prevTabBtn, "RIGHT", 0, 0)
+        end
+        ui.tabButtons[k] = b
+        prevTabBtn = b
+    end
+
+    local ac = CreateFrame("Frame", nil, f)
+    ac:SetPoint("LEFT", tabSeg, "RIGHT", 12, 0)
+    ac:SetPoint("RIGHT", f, "RIGHT", -22, 0)
+    ac:SetHeight(20)
+    ui.anchorContainer = ac
 
     local prevAnchor = nil
     for _, a in ipairs(ANCHORS) do
-        local b = CreateFrame("Button", "WrathMentorAnchor" .. a.key, f, "UIPanelButtonTemplate")
+        local b = CreateFrame("Button", "WrathMentorAnchor" .. a.key, ac, "UIPanelButtonTemplate")
         b:SetWidth(a.w)
         b:SetHeight(18)
         b:SetText(WM.L[a.label])
         if not prevAnchor then
-            b:SetPoint("LEFT", navLabel, "RIGHT", 8, 0)
+            b:SetPoint("LEFT", ac, "LEFT", 0, 0)
         else
             b:SetPoint("LEFT", prevAnchor, "RIGHT", 3, 0)
         end
@@ -1135,9 +1397,11 @@ local function CreateMain()
         prevAnchor = b
     end
 
-    -- Detail Scroll Frame (100% Full Width across content area)
+    --------------------------------------------------------------
+    -- Tab Content 1: Tactics ScrollFrame
+    --------------------------------------------------------------
     local detailScroll = CreateFrame("ScrollFrame", "WrathMentorDetailScroll", f, "UIPanelScrollFrameTemplate")
-    detailScroll:SetPoint("TOPLEFT", f, "TOPLEFT", 236, -96)
+    detailScroll:SetPoint("TOPLEFT", f, "TOPLEFT", 238, -94)
     detailScroll:SetPoint("BOTTOMRIGHT", f, "BOTTOMRIGHT", -22, 48)
     local detailChild = CreateFrame("Frame", nil, detailScroll)
     detailChild:SetWidth(DETAIL_W)
@@ -1152,9 +1416,103 @@ local function CreateMain()
     measureFS:Hide()
     ui.measureFS = measureFS
 
-    -- Copy View
+    --------------------------------------------------------------
+    -- Tab Content 2: Dedicated Abilities ScrollFrame
+    --------------------------------------------------------------
+    local abilitiesScroll = CreateFrame("ScrollFrame", "WrathMentorAbilitiesScroll", f, "UIPanelScrollFrameTemplate")
+    abilitiesScroll:SetPoint("TOPLEFT", f, "TOPLEFT", 238, -94)
+    abilitiesScroll:SetPoint("BOTTOMRIGHT", f, "BOTTOMRIGHT", -22, 48)
+    local abilitiesChild = CreateFrame("Frame", nil, abilitiesScroll)
+    abilitiesChild:SetWidth(DETAIL_W)
+    abilitiesChild:SetHeight(10)
+    abilitiesScroll:SetScrollChild(abilitiesChild)
+    EnableWheel(abilitiesScroll)
+    RegisterScrollBar(abilitiesScroll, false)
+    abilitiesScroll:Hide()
+    ui.abilitiesScroll = abilitiesScroll
+    ui.abilitiesChild = abilitiesChild
+
+    local abHeader = abilitiesChild:CreateFontString(nil, "ARTWORK", "GameFontNormal")
+    abHeader:SetJustifyH("LEFT")
+    ui.abHeader = abHeader
+
+    local buffHeader = abilitiesChild:CreateFontString(nil, "ARTWORK", "GameFontNormal")
+    buffHeader:SetJustifyH("LEFT")
+    ui.buffHeader = buffHeader
+
+    --------------------------------------------------------------
+    -- Tab Content 3: Embedded Personal Notes Frame
+    --------------------------------------------------------------
+    local nf = CreateFrame("Frame", "WrathMentorNotesEmbedded", f)
+    nf:SetPoint("TOPLEFT", f, "TOPLEFT", 238, -94)
+    nf:SetPoint("BOTTOMRIGHT", f, "BOTTOMRIGHT", -22, 48)
+    nf:Hide()
+    ui.notesFrame = nf
+
+    local notesTitle = nf:CreateFontString(nil, "ARTWORK", "GameFontNormal")
+    notesTitle:SetPoint("TOPLEFT", nf, "TOPLEFT", 4, 0)
+    notesTitle:SetJustifyH("LEFT")
+    ui.notesTitle = notesTitle
+
+    local notesHint = nf:CreateFontString(nil, "ARTWORK", "GameFontHighlightSmall")
+    notesHint:SetPoint("TOPLEFT", notesTitle, "BOTTOMLEFT", 0, -4)
+    notesHint:SetText(WM.L["Type your private notes here. They are saved automatically."] or "Type your private notes here. They are saved automatically.")
+    notesHint:SetTextColor(0.6, 0.6, 0.6)
+
+    local notesInner = CreateFrame("Frame", nil, nf)
+    notesInner:SetPoint("TOPLEFT", notesHint, "BOTTOMLEFT", 0, -8)
+    notesInner:SetPoint("BOTTOMRIGHT", nf, "BOTTOMRIGHT", 0, 32)
+    ui.notesInnerBox = notesInner
+
+    local notesScroll = CreateFrame("ScrollFrame", "WrathMentorNotesScroll", notesInner, "UIPanelScrollFrameTemplate")
+    notesScroll:SetPoint("TOPLEFT", notesInner, "TOPLEFT", 6, -6)
+    notesScroll:SetPoint("BOTTOMRIGHT", notesInner, "BOTTOMRIGHT", -24, 6)
+    EnableWheel(notesScroll)
+    RegisterScrollBar(notesScroll, false)
+
+    local notesEdit = CreateFrame("EditBox", "WrathMentorNotesEdit", notesScroll)
+    notesEdit:SetMultiLine(true)
+    notesEdit:SetAutoFocus(false)
+    notesEdit:SetFontObject(ChatFontNormal)
+    notesEdit:SetWidth(DETAIL_W - 32)
+    notesEdit:SetHeight(240)
+    notesEdit:SetMaxLetters(4000)
+    notesScroll:SetScrollChild(notesEdit)
+    notesEdit:SetScript("OnEscapePressed", function(self) self:ClearFocus() end)
+    notesEdit:SetScript("OnTextChanged", function(self, userInput)
+        if userInput then
+            ui.notesDirty = true
+            ui.notesStatus:SetText(WM.L["Unsaved changes"])
+        end
+        local text = self:GetText() or ""
+        local lines = 0
+        for line in string.gmatch(text .. "\n", "(.-)\n") do
+            lines = lines + math.max(1, math.ceil(string.len(line) / 36))
+        end
+        self:SetHeight(math.max(240, lines * 14 + 20))
+    end)
+    ui.notesEdit = notesEdit
+
+    local saveNotesBtn = CreateFrame("Button", nil, nf, "UIPanelButtonTemplate")
+    saveNotesBtn:SetWidth(90)
+    saveNotesBtn:SetHeight(22)
+    saveNotesBtn:SetPoint("BOTTOMLEFT", nf, "BOTTOMLEFT", 0, 4)
+    saveNotesBtn:SetText(WM.L["Save"])
+    saveNotesBtn:SetScript("OnClick", function()
+        notesEdit:ClearFocus()
+        WM:SaveNotes(false)
+    end)
+    RegisterButton(saveNotesBtn)
+
+    local notesStatus = nf:CreateFontString(nil, "ARTWORK", "GameFontHighlightSmall")
+    notesStatus:SetPoint("LEFT", saveNotesBtn, "RIGHT", 10, 0)
+    ui.notesStatus = notesStatus
+
+    --------------------------------------------------------------
+    -- Tab Content 4: Copy Export Frame
+    --------------------------------------------------------------
     local cf = CreateFrame("Frame", "WrathMentorCopyFrame", f)
-    cf:SetPoint("TOPLEFT", f, "TOPLEFT", 236, -96)
+    cf:SetPoint("TOPLEFT", f, "TOPLEFT", 238, -94)
     cf:SetPoint("BOTTOMRIGHT", f, "BOTTOMRIGHT", -22, 48)
     cf:Hide()
     ui.copyFrame = cf
@@ -1201,11 +1559,13 @@ local function CreateMain()
     measure:Hide()
     ui.copyMeasure = measure
 
-    -- Bottom Controls
+    --------------------------------------------------------------
+    -- Bottom Bar: Full Chat Actions, Checkbox, Settings
+    --------------------------------------------------------------
     local send = CreateFrame("Button", "WrathMentorSendButton", f, "UIPanelButtonTemplate")
     send:SetWidth(120)
     send:SetHeight(22)
-    send:SetPoint("BOTTOMLEFT", f, "BOTTOMLEFT", 236, 16)
+    send:SetPoint("BOTTOMLEFT", f, "BOTTOMLEFT", 238, 16)
     send:SetText(WM.L["Send to chat"])
     send:SetScript("OnClick", function() WM:Send(WM.selected) end)
     RegisterButton(send)
@@ -1259,12 +1619,12 @@ end
 
 function WM:LayoutMain()
     if not ui.detailScroll or not ui.main then return end
-    ui.detailScroll:ClearAllPoints()
-    ui.detailScroll:SetPoint("TOPLEFT", ui.main, "TOPLEFT", 236, -96)
-    ui.detailScroll:SetPoint("BOTTOMRIGHT", ui.main, "BOTTOMRIGHT", -22, 48)
-
     local dw = ui.detailScroll:GetWidth()
-    if dw and dw > 0 and ui.detailChild then ui.detailChild:SetWidth(dw) end
+    if dw and dw > 0 then
+        if ui.detailChild then ui.detailChild:SetWidth(dw) end
+        if ui.abilitiesChild then ui.abilitiesChild:SetWidth(dw) end
+        if ui.notesEdit then ui.notesEdit:SetWidth(dw - 32) end
+    end
     if ui.copyScroll then
         local cw = ui.copyScroll:GetWidth()
         if cw and cw > 0 then
@@ -1272,8 +1632,10 @@ function WM:LayoutMain()
             if ui.copyMeasure then ui.copyMeasure:SetWidth(cw - 6) end
         end
     end
+
     if ui.main:IsShown() then
-        self:RefreshDetail()
+        if ui.activeTab == "tactics" then self:RefreshDetail() end
+        if ui.activeTab == "abilities" then self:RefreshAbilitiesTab() end
         if ui.copyMode then self:RefreshCopy() end
     end
 end
@@ -1293,8 +1655,8 @@ function WM:ShowMain(boss)
     if firstCreate then self:ApplyMainScale(); self:ApplyMainAlpha() end
     self:RefreshOptions()
     self:RefreshList()
+    self:SetTab(ui.activeTab or "tactics")
     self:LayoutMain()
-    self:LoadNotes()
 end
 
 function WM:ToggleMain()
@@ -1302,7 +1664,7 @@ function WM:ToggleMain()
 end
 
 ------------------------------------------------------------------
--- Quick Popup
+-- Modern Redesigned Quick Popup (HUD)
 ------------------------------------------------------------------
 function WM:SetQuickRole(roleKey)
     self.db.quickRole = roleKey
@@ -1314,7 +1676,7 @@ end
 local function CreateQuick()
     local q = CreateFrame("Frame", "WrathMentorQuick", UIParent)
     ui.quick = q
-    q:SetWidth(360)
+    q:SetWidth(380)
     q:SetHeight(130)
     q:SetFrameStrata("HIGH")
     q:SetMovable(true)
@@ -1330,53 +1692,61 @@ local function CreateQuick()
     q:SetScale(WM.db.quickScale or 1)
     q:Hide()
 
+    -- Title with boss name & raid size
     q.title = q:CreateFontString(nil, "ARTWORK", "GameFontNormal")
     q.title:SetPoint("TOPLEFT", q, "TOPLEFT", 12, -10)
-    q.title:SetWidth(312)
+    q.title:SetPoint("RIGHT", q, "RIGHT", -32, 0)
     q.title:SetJustifyH("LEFT")
 
+    -- Modern Segmented Control for Quick Roles
+    local qSeg = CreateFrame("Frame", "WrathMentorQuickRoleSeg", q)
+    qSeg:SetPoint("TOPLEFT", q, "TOPLEFT", 10, -30)
+    qSeg:SetHeight(20)
+    qSeg:SetWidth(206)
+    ui.quickRoleSegment = qSeg
+
     local prevQR = nil
-    for _, qr in ipairs(QUICK_ROLES) do
-        local b = CreateFrame("Button", "WrathMentorQuickRole" .. qr.key, q, "UIPanelButtonTemplate")
-        b:SetWidth(qr.w)
-        b:SetHeight(18)
-        b:SetText(WM.L[qr.label])
-        if not prevQR then
-            b:SetPoint("TOPLEFT", q, "TOPLEFT", 12, -28)
-        else
-            b:SetPoint("LEFT", prevQR, "RIGHT", 4, 0)
-        end
+    for i, qr in ipairs(QUICK_ROLES) do
         local k = qr.key
-        b:SetScript("OnClick", function() WM:SetQuickRole(k) end)
-        RegisterButton(b)
+        local b = CreateSegmentBtn("WrathMentorQuickRole" .. k, qSeg, qr.w, 18, WM.L[qr.label] or qr.label, function()
+            WM:SetQuickRole(k)
+        end)
+        if i == 1 then
+            b:SetPoint("TOPLEFT", qSeg, "TOPLEFT", 1, -1)
+        else
+            b:SetPoint("LEFT", prevQR, "RIGHT", 0, 0)
+        end
         ui.quickRoleButtons[k] = b
         prevQR = b
     end
 
-    q.body = q:CreateFontString(nil, "ARTWORK", "GameFontHighlightSmall")
-    q.body:SetPoint("TOPLEFT", q, "TOPLEFT", 12, -52)
-    q.body:SetWidth(336)
-    q.body:SetJustifyH("LEFT")
-    q.body:SetJustifyV("TOP")
-
+    -- Close Button
     local close = CreateFrame("Button", nil, q, "UIPanelCloseButton")
     close:SetPoint("TOPRIGHT", q, "TOPRIGHT", -2, -2)
 
+    -- Content Body Text
+    q.body = q:CreateFontString(nil, "ARTWORK", "GameFontHighlightSmall")
+    q.body:SetPoint("TOPLEFT", q, "TOPLEFT", 12, -56)
+    q.body:SetPoint("RIGHT", q, "RIGHT", -12, 0)
+    q.body:SetJustifyH("LEFT")
+    q.body:SetJustifyV("TOP")
+
+    -- Action Buttons (Bottom-Right)
     local full = CreateFrame("Button", nil, q, "UIPanelButtonTemplate")
-    full:SetWidth(90)
+    full:SetWidth(94)
     full:SetHeight(20)
     full:SetPoint("BOTTOMRIGHT", q, "BOTTOMRIGHT", -10, 8)
-    full:SetText(WM.L["Full guide"])
+    full:SetText(WM.L["Full guide"] or "Full guide")
     full:SetScript("OnClick", function()
         if q.boss then WM:ShowMain(q.boss) end
     end)
     RegisterButton(full)
 
     local send = CreateFrame("Button", nil, q, "UIPanelButtonTemplate")
-    send:SetWidth(90)
+    send:SetWidth(84)
     send:SetHeight(20)
     send:SetPoint("RIGHT", full, "LEFT", -4, 0)
-    send:SetText(WM.L["Send"])
+    send:SetText(WM.L["Send"] or "Send")
     send:SetScript("OnClick", function()
         if q.boss then WM:Send(q.boss) end
     end)
@@ -1393,15 +1763,19 @@ function WM:ShowQuick(boss)
 
     local currentQRole = self.db.quickRole or "TLDR"
     for k, btn in pairs(ui.quickRoleButtons) do
-        if k == currentQRole then btn:Disable() else btn:Enable() end
-        UpdateButtonVisual(btn)
+        UpdateSegmentButtonVisual(btn, k == currentQRole)
     end
 
     local bName = boss.displayName or boss.name
     local sizeStr = string.format(self.L["%d-man"], self:GetSize())
-    q.title:SetText(bName .. "  |cff9d9d9d(" .. sizeStr .. ")|r")
-    q.body:SetText(self:GetQuickText(boss))
-    q:SetHeight(q.body:GetStringHeight() + 86)
+    q.title:SetText(C.title .. bName .. "|r  " .. C.grey .. "(" .. sizeStr .. ")|r")
+    
+    local text = self:GetQuickText(boss) or ""
+    q.body:SetText(text)
+    
+    -- Dynamically calculate height based on rendered text
+    local textH = q.body:GetStringHeight() or 20
+    q:SetHeight(math.max(114, textH + 92))
     q:Show()
 end
 
@@ -1412,8 +1786,8 @@ end
 function WM:ResetPositions()
     if ui.main then
         RestorePos(ui.main, "mainPos", "CENTER", "CENTER", 0, 0)
-        ui.main:SetWidth(WM.db.mainWidth or 760)
-        ui.main:SetHeight(WM.db.mainHeight or 500)
+        ui.main:SetWidth(WM.db.mainWidth or 780)
+        ui.main:SetHeight(WM.db.mainHeight or 520)
         self:LayoutMain()
     end
     if ui.quick then RestorePos(ui.quick, "quickPos", "TOP", "TOP", 0, -170) end
@@ -1513,7 +1887,8 @@ local CHECK_OPTIONS = {
         set = function(v)
             WM.db.theme = v and "dark" or "classic"
             WM:ApplyTheme()
-            WM:RefreshDetail()
+            if ui.activeTab == "tactics" then WM:RefreshDetail() end
+            if ui.activeTab == "abilities" then WM:RefreshAbilitiesTab() end
         end,
     },
     {
