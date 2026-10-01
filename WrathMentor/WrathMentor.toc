@@ -1,0 +1,26 @@
+## Interface: 30300
+## Title: Wrath Mentor
+## Title-ruRU: Wrath Mentor
+## Notes: In-game tactics for every WotLK raid boss (10/25-man, hard modes, ability links, live 3D model preview, chat announcements, personal notes, resizable window). Type /wm
+## Notes-ruRU: Внутриигровой справочник тактик для всех рейдовых боссов WotLK (10/25 чел., хардмоды, интерактивные ссылки, живые 3D-модели боссов, личные заметки, настраиваемое окно). Команда: /wm
+## Author: Saranwrap (Fork & ruRU by dadec666)
+## Version: 2.15.3
+## SavedVariables: WrathMentorDB
+
+Localization.lua
+Locales\ruRU\UI_ruRU.lua
+
+Core.lua
+Data_Naxxramas.lua
+Data_Sanctum.lua
+Data_Ulduar.lua
+Data_Trial.lua
+Data_Icecrown.lua
+
+Locales\ruRU\Data_Sanctum.lua
+Locales\ruRU\Data_Trial.lua
+Locales\ruRU\Data_Icecrown.lua
+Locales\ruRU\Data_Naxxramas.lua
+Locales\ruRU\Data_Ulduar.lua
+
+UI.lua
