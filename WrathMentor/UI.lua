@@ -1,4 +1,4 @@
--- Wrath Mentor - UI (v2.15.3 Interactive Words & 3D Models Edition)
+-- Wrath Mentor - UI (v2.15.3 Clean & Interactive Edition)
 local WM = WrathMentor
 
 local ROW_H = 18
@@ -284,7 +284,7 @@ function WM:ApplyTheme()
 end
 
 ------------------------------------------------------------------
--- List rows
+-- List Rows
 ------------------------------------------------------------------
 local function RowClick(self)
     local d = self.data
@@ -390,7 +390,7 @@ local function AbilityClick(self, button)
 end
 
 ------------------------------------------------------------------
--- Pools (FontStrings, Word-Buttons, Ability Rows)
+-- Pools
 ------------------------------------------------------------------
 local function GetFS(i)
     local fs = ui.fsPool[i]
@@ -472,54 +472,6 @@ local function GetBuffRow(i)
         ui.buffPool[i] = row
     end
     return row
-end
-
-------------------------------------------------------------------
--- 3D Model Engine
-------------------------------------------------------------------
-local function ClearModel()
-    if ui.model then pcall(function() ui.model:SetModel("") end) end
-end
-
-function WM:ResetModelView()
-    if not ui.model then return end
-    if ui.model.SetPosition then ui.model:SetPosition(0, 0, 0) end
-    if ui.model.SetFacing then ui.model:SetFacing(0) end
-    if ui.model.SetPortraitZoom then ui.model:SetPortraitZoom(0.35) end
-end
-
-function WM:RefreshModel()
-    if not ui.modelPreview or not ui.model then return end
-    if not self.db.modelsEnabled then
-        ClearModel()
-        ui.modelPreview:Hide()
-        return
-    end
-    ui.modelPreview:Show()
-    local boss = self.selected
-    if not boss then
-        ClearModel()
-        ui.model:Hide()
-        return
-    end
-    if self:TargetIsBoss(boss) then
-        ClearModel()
-        ui.model:Show()
-        pcall(function() ui.model:SetUnit("target") end)
-        self:ResetModelView()
-    elseif boss.npcId then
-        ClearModel()
-        local ok = pcall(function() ui.model:SetCreature(boss.npcId) end)
-        if ok then
-            ui.model:Show()
-            self:ResetModelView()
-        else
-            ui.model:Hide()
-        end
-    else
-        ClearModel()
-        ui.model:Hide()
-    end
 end
 
 ------------------------------------------------------------------
@@ -753,7 +705,6 @@ function WM:RefreshDetail()
 
     ui.detailChild:SetHeight(y + 24)
     ui.detailScroll:SetVerticalScroll(0)
-    self:RefreshModel()
     if ui.copyMode then self:RefreshCopy() end
 end
 
@@ -991,7 +942,6 @@ function WM:RefreshOptions()
             UpdateButtonVisual(btn)
         end
     end
-    self:RefreshModel()
     ui.refreshing = false
 end
 
@@ -1070,7 +1020,7 @@ local function CreateMain()
     ui.listScroll = listScroll
     ui.listChild = listChild
 
-    -- Separator
+    -- Vertical Separator
     local sep = f:CreateTexture(nil, "BORDER")
     sep:SetPoint("TOPLEFT", f, "TOPLEFT", 226, -40)
     sep:SetPoint("BOTTOMLEFT", f, "BOTTOMLEFT", 226, 44)
@@ -1185,19 +1135,7 @@ local function CreateMain()
         prevAnchor = b
     end
 
-    -- 3D Model Preview Frame (Top-Right Dock)
-    pcall(function()
-        local mp = CreateFrame("Frame", "WrathMentorModelPreview", f)
-        mp:SetPoint("TOPRIGHT", f, "TOPRIGHT", -22, -96)
-        mp:SetWidth(130)
-        mp:SetHeight(116)
-        local model = CreateFrame("PlayerModel", "WrathMentorModel", mp)
-        model:SetAllPoints(mp)
-        ui.modelPreview = mp
-        ui.model = model
-    end)
-
-    -- Detail Scroll Frame
+    -- Detail Scroll Frame (100% Full Width across content area)
     local detailScroll = CreateFrame("ScrollFrame", "WrathMentorDetailScroll", f, "UIPanelScrollFrameTemplate")
     detailScroll:SetPoint("TOPLEFT", f, "TOPLEFT", 236, -96)
     detailScroll:SetPoint("BOTTOMRIGHT", f, "BOTTOMRIGHT", -22, 48)
@@ -1322,13 +1260,8 @@ end
 function WM:LayoutMain()
     if not ui.detailScroll or not ui.main then return end
     ui.detailScroll:ClearAllPoints()
-    if self.db.modelsEnabled then
-        ui.detailScroll:SetPoint("TOPLEFT", ui.main, "TOPLEFT", 236, -96)
-        ui.detailScroll:SetPoint("BOTTOMRIGHT", ui.main, "BOTTOMRIGHT", -158, 48)
-    else
-        ui.detailScroll:SetPoint("TOPLEFT", ui.main, "TOPLEFT", 236, -96)
-        ui.detailScroll:SetPoint("BOTTOMRIGHT", ui.main, "BOTTOMRIGHT", -22, 48)
-    end
+    ui.detailScroll:SetPoint("TOPLEFT", ui.main, "TOPLEFT", 236, -96)
+    ui.detailScroll:SetPoint("BOTTOMRIGHT", ui.main, "BOTTOMRIGHT", -22, 48)
 
     local dw = ui.detailScroll:GetWidth()
     if dw and dw > 0 and ui.detailChild then ui.detailChild:SetWidth(dw) end
@@ -1369,7 +1302,7 @@ function WM:ToggleMain()
 end
 
 ------------------------------------------------------------------
--- Quick Popup (Target HUD)
+-- Quick Popup
 ------------------------------------------------------------------
 function WM:SetQuickRole(roleKey)
     self.db.quickRole = roleKey
@@ -1581,14 +1514,6 @@ local CHECK_OPTIONS = {
             WM.db.theme = v and "dark" or "classic"
             WM:ApplyTheme()
             WM:RefreshDetail()
-        end,
-    },
-    {
-        labelKey = "Show the 3D boss model preview",
-        get = function() return WM.db.modelsEnabled end,
-        set = function(v)
-            WM.db.modelsEnabled = v
-            WM:LayoutMain()
         end,
     },
     {
