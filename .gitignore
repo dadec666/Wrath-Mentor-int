@@ -1,0 +1,19 @@
+# Системный мусор ОС
+Thumbs.db
+Desktop.ini
+.DS_Store
+
+# Настройки среды разработки (кроме общих конфигураций)
+.vscode/*
+!.vscode/settings.json
+*.code-workspace
+
+# Временные файлы и релизные архивы
+*.zip
+*.rar
+*.7z
+*.tmp
+*.bak
+
+# Логи клиента
+*.log
